@@ -32,6 +32,7 @@
 // CHECK-NEXT:   module:
 // CHECK-NEXT:     name: ModA
 // CHECK-NEXT:     context-hash: [[HASH_MOD_A:[A-Z0-9]+]]
+// CHECK-NEXT:     cwd-ignored: 0
 // CHECK-NEXT:     module-map-path: [[PREFIX]]/Inputs/module/module.modulemap
 // CHECK-NEXT:     casfs-root-id: [[CASFS_MODA_ROOT_ID:llvmcas://[[:xdigit:]]+]]
 // CHECK-NEXT:     cache-key: [[CASFS_MODA_CACHE_KEY:llvmcas://[[:xdigit:]]+]]

@@ -126,6 +126,15 @@ clang_experimental_DependencyScannerServiceOptions_setCASOptions(
     CXDependencyScannerServiceOptions Opts, CXCASOptions);
 
 /**
+ * Turn on working directory optimization. The dependency scanner service
+ * option Opts will indicate to the scanner through Opts that the current
+ * working directory can be ignored.
+ */
+CINDEX_LINKAGE void
+clang_experimental_DependencyScannerServiceOptions_enable_cwd_optimization(
+    CXDependencyScannerServiceOptions Opts);
+
+/**
  * Specify a \c CXCASObjectStore in the given options. If an object store and
  * action cache are available, the scanner will produce cached commands.
  * Deprecated, use
@@ -419,6 +428,14 @@ CINDEX_LINKAGE const char *
  */
 CINDEX_LINKAGE
 const char *clang_experimental_DepGraphModule_getCacheKey(CXDepGraphModule);
+
+/**
+ * \returns 1 if the current working directory if the module's context hash
+ * and compile commands ignores the current working directory.
+ *  Otherwise returns 0.
+ */
+CINDEX_LINKAGE
+int clang_experimental_DepGraphModule_isCWDIgnored(CXDepGraphModule);
 
 /**
  * \returns the number \c CXDepGraphTUCommand objects in the graph.
