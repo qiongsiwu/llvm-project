@@ -127,8 +127,10 @@ clang_experimental_DependencyScannerServiceOptions_setCASOptions(
 
 /**
  * Turn on working directory optimization. The dependency scanner service
- * option Opts will indicate to the scanner through Opts that the current
- * working directory can be ignored.
+ * option Opts will indicate to the scanner that the current
+ * working directory can be ignored when computing the pcms' context hashes.
+ * The scanner will then determine if it is safe to optimize each module and act
+ * accordingly.
  */
 CINDEX_LINKAGE void
 clang_experimental_DependencyScannerServiceOptions_enable_cwd_optimization(
@@ -430,8 +432,8 @@ CINDEX_LINKAGE
 const char *clang_experimental_DepGraphModule_getCacheKey(CXDepGraphModule);
 
 /**
- * \returns 1 if the current working directory if the module's context hash
- * and compile commands ignores the current working directory.
+ * \returns 1 if the scanner ignores the current working directory when
+ * computing the module's context hash.
  *  Otherwise returns 0.
  */
 CINDEX_LINKAGE
