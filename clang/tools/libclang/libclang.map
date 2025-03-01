@@ -574,7 +574,7 @@ LLVM_21 {
   global:
     clang_experimental_DependencyScannerServiceOptions_enable_cwd_optimization;
     clang_experimental_DepGraphModule_isCWDIgnored;
-}
+};
 
 # Example of how to add a new symbol version entry.  If you do add a new symbol
 # version, please update the example to depend on the version you added.
