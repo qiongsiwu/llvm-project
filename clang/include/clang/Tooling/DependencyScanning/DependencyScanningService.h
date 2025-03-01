@@ -83,7 +83,7 @@ enum class ScanningOptimizations {
   IgnoreCWD = (1 << 4),
 
   DSS_LAST_BITMASK_ENUM(IgnoreCWD),
-  Default = All,
+  Default = All & (~IgnoreCWD),
   FullIncludeTreeIrrelevant = HeaderSearch | VFS,
 };
 
