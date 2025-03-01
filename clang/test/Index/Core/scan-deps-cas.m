@@ -73,6 +73,7 @@
 // INCLUDE_TREE-NEXT:   module:
 // INCLUDE_TREE-NEXT:     name: ModA
 // INCLUDE_TREE-NEXT:     context-hash: [[HASH_MOD_A:[A-Z0-9]+]]
+// INCLUDE_TREE-NEXT:     cwd-ignored: 0
 // INCLUDE_TREE-NEXT:     module-map-path: [[PREFIX]]/Inputs/module/module.modulemap
 // INCLUDE_TREE-NEXT:     include-tree-id: [[ModA_INCLUDE_TREE_ID:llvmcas://[[:xdigit:]]+]]
 // INCLUDE_TREE-NEXT:     cache-key: [[ModA_CACHE_KEY:llvmcas://[[:xdigit:]]+]]
