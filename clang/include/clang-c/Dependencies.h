@@ -126,15 +126,18 @@ clang_experimental_DependencyScannerServiceOptions_setCASOptions(
     CXDependencyScannerServiceOptions Opts, CXCASOptions);
 
 /**
- * Turn on working directory optimization. The dependency scanner service
- * option Opts will indicate to the scanner that the current
- * working directory can be ignored when computing the pcms' context hashes.
- * The scanner will then determine if it is safe to optimize each module and act
- * accordingly.
+ * Set the working directory optimization option.
+ * The dependency scanner service option Opts will indicate to the scanner that
+ * the current working directory can or cannot be ignored when computing the
+ * pcms' context hashes. The scanner will then determine if it is safe to
+ * optimize each module and act accordingly.
+ *
+ * \param Value If it is non zero, the option is on. Otherwise the
+ * option is off.
  */
 CINDEX_LINKAGE void
-clang_experimental_DependencyScannerServiceOptions_enable_cwd_optimization(
-    CXDependencyScannerServiceOptions Opts);
+clang_experimental_DependencyScannerServiceOptions_setCWDOptimization(
+    CXDependencyScannerServiceOptions Opts, int Value);
 
 /**
  * Specify a \c CXCASObjectStore in the given options. If an object store and

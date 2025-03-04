@@ -101,9 +101,13 @@ void clang_experimental_DependencyScannerServiceOptions_setCASOptions(
   unwrap(Opts)->CASOpts = *cas::unwrap(CASOpts);
 }
 
-void clang_experimental_DependencyScannerServiceOptions_enable_cwd_optimization(
-    CXDependencyScannerServiceOptions Opts) {
-  unwrap(Opts)->OptimizeArgs |= ScanningOptimizations::IgnoreCWD;
+void clang_experimental_DependencyScannerServiceOptions_setCWDOptimization(
+    CXDependencyScannerServiceOptions Opts, int Value) {
+  auto Mask =
+      Value != 0 ? ScanningOptimizations::All : ScanningOptimizations::None;
+  auto OptArgs = unwrap(Opts)->OptimizeArgs;
+  unwrap(Opts)->OptimizeArgs = (OptArgs & ~ScanningOptimizations::IgnoreCWD) |
+                               (ScanningOptimizations::IgnoreCWD & Mask);
 }
 
 void clang_experimental_DependencyScannerServiceOptions_setObjectStore(
