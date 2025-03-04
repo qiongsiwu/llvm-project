@@ -722,8 +722,8 @@ static int scanDeps(ArrayRef<const char *> Args, std::string WorkingDirectory,
       Opts, CXDependencyMode_Full);
 
   if (options::OptimizeCWD)
-    clang_experimental_DependencyScannerServiceOptions_enable_cwd_optimization(
-        Opts);
+    clang_experimental_DependencyScannerServiceOptions_setCWDOptimization(Opts,
+                                                                          1);
 
   if (DBs)
     clang_experimental_DependencyScannerServiceOptions_setCASDatabases(Opts,
