@@ -436,8 +436,7 @@ const char *clang_experimental_DepGraphModule_getCacheKey(CXDepGraphModule);
 
 /**
  * \returns 1 if the scanner ignores the current working directory when
- * computing the module's context hash.
- *  Otherwise returns 0.
+ * computing the module's context hash. Otherwise returns 0.
  */
 CINDEX_LINKAGE
 int clang_experimental_DepGraphModule_isCWDIgnored(CXDepGraphModule);
