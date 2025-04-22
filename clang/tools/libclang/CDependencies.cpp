@@ -566,16 +566,21 @@ clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
     CXDependencyScannerService S) {
   DependencyScanningService *Service = unwrap(S);
 
-  // CASFS does not use the SharedCache, so there is nothing to diagnose.
+  // FIXME: CAS currently does not use the shared cache, and cannot produce
+  // the same diagnostics. We should add such a diagnostics to CAS as well.
   if (Service->useCASFS())
     return nullptr;
 
   DependencyScanningFilesystemSharedCache &SharedCache =
       Service->getSharedCache();
+
+  // Note that it is critical that this FS is the same as the default virtual
+  // file system we pass to the DependencyScanningWorkers.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
       llvm::vfs::createPhysicalFileSystem();
+
   auto InvaidNegStatCachedPaths =
-      SharedCache.getInvalidNegativeStatCachedPaths(*FS.get());
+      SharedCache.getInvalidNegativeStatCachedPaths(*FS);
   return cxstring::createSet(std::vector<std::string>(
       InvaidNegStatCachedPaths.begin(), InvaidNegStatCachedPaths.end()));
 }
