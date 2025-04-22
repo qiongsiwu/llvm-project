@@ -561,6 +561,25 @@ CXDiagnosticSet clang_experimental_DepGraph_getDiagnostics(CXDepGraph Graph) {
   return unwrap(Graph)->getDiagnosticSet();
 }
 
+CXStringSet *
+clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
+    CXDependencyScannerService S) {
+  DependencyScanningService *Service = unwrap(S);
+
+  // CASFS does not use the SharedCache, so there is nothing to diagnose.
+  if (Service->useCASFS())
+    return nullptr;
+
+  DependencyScanningFilesystemSharedCache &SharedCache =
+      Service->getSharedCache();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
+      llvm::vfs::createPhysicalFileSystem();
+  auto InvaidNegStatCachedPaths =
+      SharedCache.getInvalidNegativeStatCachedPaths(*FS.get());
+  return cxstring::createSet(std::vector<std::string>(
+      InvaidNegStatCachedPaths.begin(), InvaidNegStatCachedPaths.end()));
+}
+
 static std::string
 lookupModuleOutput(const ModuleDeps &MD, ModuleOutputKind MOK, void *MLOContext,
                    std::variant<CXModuleLookupOutputCallback *,
