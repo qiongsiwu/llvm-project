@@ -68,7 +68,10 @@ CXString createRef(std::string String) = delete;
 /// Create a CXString object that is backed by a string buffer.
 CXString createCXString(CXStringBuf *buf);
 
+/// Create a CXStringSet object owns the strings. Such an object should be
+/// disposed with clang_disposeStringSet.
 CXStringSet *createSet(const std::vector<std::string> &Strings);
+CXStringSet *createSet(const std::vector<StringRef> &Strings);
 
 CXStringSet *createSet(const llvm::StringSet<> &Strings);
 
