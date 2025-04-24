@@ -581,8 +581,7 @@ clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
 
   auto InvaidNegStatCachedPaths =
       SharedCache.getInvalidNegativeStatCachedPaths(*FS);
-  return cxstring::createSet(std::vector<std::string>(
-      InvaidNegStatCachedPaths.begin(), InvaidNegStatCachedPaths.end()));
+  return cxstring::createRefSet(InvaidNegStatCachedPaths);
 }
 
 static std::string
