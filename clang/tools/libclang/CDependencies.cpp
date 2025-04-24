@@ -41,12 +41,71 @@ struct DependencyScannerServiceOptions {
 
   ScanningOutputFormat getFormat() const;
 };
+
+struct CStringsManager {
+  SmallVector<std::unique_ptr<std::vector<const char *>>> OwnedCStr;
+  SmallVector<std::unique_ptr<std::vector<std::string>>> OwnedStdStr;
+
+  template <typename StringTy>
+  CXCStringArray createCStringsRefImpl(
+      ArrayRef<StringTy> Strings,
+      std::function<const char *(const StringTy &)> strGetter) {
+    OwnedCStr.push_back(std::make_unique<std::vector<const char *>>());
+    std::vector<const char *> &CStrings = *OwnedCStr.back();
+    CStrings.reserve(Strings.size());
+    for (const auto &String : Strings)
+      CStrings.push_back(strGetter(String));
+    return {CStrings.data(), CStrings.size()};
+  }
+
+  /// The two methods below create a CXCSringArray that does not own its
+  /// contents.
+  CXCStringArray createCStringsRef(ArrayRef<std::string> Strings) {
+    return createCStringsRefImpl<std::string>(
+        Strings, [](const std::string &String) { return String.c_str(); });
+  }
+
+  CXCStringArray createCStringsRef(ArrayRef<StringRef> Strings) {
+    return createCStringsRefImpl<StringRef>(
+        Strings, [](const StringRef &String) { return String.begin(); });
+  }
+
+  /// Doesn't own the string contents.
+  CXCStringArray createCStringsRef(const llvm::StringSet<> &StringsUnordered) {
+    std::vector<StringRef> Strings;
+
+    for (auto SI = StringsUnordered.begin(), SE = StringsUnordered.end();
+         SI != SE; ++SI)
+      Strings.push_back(SI->getKey());
+
+    llvm::sort(Strings);
+
+    OwnedCStr.push_back(std::make_unique<std::vector<const char *>>());
+    std::vector<const char *> &CStrings = *OwnedCStr.back();
+    CStrings.reserve(Strings.size());
+    for (const auto &String : Strings)
+      CStrings.push_back(String.data());
+    return {CStrings.data(), CStrings.size()};
+  }
+
+  /// Gets ownership of string contents.
+  CXCStringArray createCStringsOwned(std::vector<std::string> &&Strings) {
+    OwnedStdStr.push_back(
+        std::make_unique<std::vector<std::string>>(std::move(Strings)));
+    return createCStringsRef(*OwnedStdStr.back());
+  }
+};
+
+struct DependencyScannerService {
+  DependencyScanningService Service;
+  CStringsManager StrMgr{};
+};
 } // end anonymous namespace
 
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerServiceOptions,
                                    CXDependencyScannerServiceOptions)
 
-DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningService,
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerService,
                                    CXDependencyScannerService)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningWorker,
                                    CXDependencyScannerWorker)
@@ -127,9 +186,9 @@ clang_experimental_DependencyScannerService_create_v0(CXDependencyMode Format) {
   // FIXME: Pass default CASOpts and nullptr as CachingOnDiskFileSystem now.
   CASOptions CASOpts;
   IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> FS;
-  return wrap(new DependencyScanningService(
+  return wrap(new DependencyScannerService{DependencyScanningService(
       ScanningMode::DependencyDirectivesScan, unwrap(Format), CASOpts,
-      /*CAS=*/nullptr, /*ActionCache=*/nullptr, FS));
+      /*CAS=*/nullptr, /*ActionCache=*/nullptr, FS)});
 }
 
 ScanningOutputFormat DependencyScannerServiceOptions::getFormat() const {
@@ -165,10 +224,10 @@ clang_experimental_DependencyScannerService_create_v1(
     FS = llvm::cantFail(
         llvm::cas::createCachingOnDiskFileSystem(CAS));
   }
-  return wrap(new DependencyScanningService(
+  return wrap(new DependencyScannerService{DependencyScanningService(
       ScanningMode::DependencyDirectivesScan, Format, unwrap(Opts)->CASOpts,
       std::move(CAS), std::move(Cache), std::move(FS),
-      unwrap(Opts)->OptimizeArgs));
+      unwrap(Opts)->OptimizeArgs)});
 }
 
 void clang_experimental_DependencyScannerService_dispose_v0(
@@ -177,17 +236,17 @@ void clang_experimental_DependencyScannerService_dispose_v0(
 }
 
 CXDependencyScannerWorker clang_experimental_DependencyScannerWorker_create_v0(
-    CXDependencyScannerService Service) {
-  ScanningOutputFormat Format = unwrap(Service)->getFormat();
+    CXDependencyScannerService S) {
+  ScanningOutputFormat Format = unwrap(S)->Service.getFormat();
   bool IsIncludeTreeOutput = Format == ScanningOutputFormat::IncludeTree ||
                              Format == ScanningOutputFormat::FullIncludeTree;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
       llvm::vfs::createPhysicalFileSystem();
   if (IsIncludeTreeOutput)
-    FS = llvm::cas::createCASProvidingFileSystem(unwrap(Service)->getCAS(),
+    FS = llvm::cas::createCASProvidingFileSystem(unwrap(S)->Service.getCAS(),
                                                  std::move(FS));
 
-  return wrap(new DependencyScanningWorker(*unwrap(Service), FS));
+  return wrap(new DependencyScanningWorker(unwrap(S)->Service, FS));
 }
 
 void clang_experimental_DependencyScannerWorker_dispose_v0(
@@ -221,46 +280,6 @@ struct DependencyScannerWorkerScanSettings {
   std::variant<CXModuleLookupOutputCallback *,
                CXModuleLookupOutputCallback_v2 *>
       MLO;
-};
-
-struct CStringsManager {
-  SmallVector<std::unique_ptr<std::vector<const char *>>> OwnedCStr;
-  SmallVector<std::unique_ptr<std::vector<std::string>>> OwnedStdStr;
-
-  /// Doesn't own the string contents.
-  CXCStringArray createCStringsRef(ArrayRef<std::string> Strings) {
-    OwnedCStr.push_back(std::make_unique<std::vector<const char *>>());
-    std::vector<const char *> &CStrings = *OwnedCStr.back();
-    CStrings.reserve(Strings.size());
-    for (const auto &String : Strings)
-      CStrings.push_back(String.c_str());
-    return {CStrings.data(), CStrings.size()};
-  }
-
-  /// Doesn't own the string contents.
-  CXCStringArray createCStringsRef(const llvm::StringSet<> &StringsUnordered) {
-    std::vector<StringRef> Strings;
-
-    for (auto SI = StringsUnordered.begin(), SE = StringsUnordered.end();
-         SI != SE; ++SI)
-      Strings.push_back(SI->getKey());
-
-    llvm::sort(Strings);
-
-    OwnedCStr.push_back(std::make_unique<std::vector<const char *>>());
-    std::vector<const char *> &CStrings = *OwnedCStr.back();
-    CStrings.reserve(Strings.size());
-    for (const auto &String : Strings)
-      CStrings.push_back(String.data());
-    return {CStrings.data(), CStrings.size()};
-  }
-
-  /// Gets ownership of string contents.
-  CXCStringArray createCStringsOwned(std::vector<std::string> &&Strings) {
-    OwnedStdStr.push_back(
-        std::make_unique<std::vector<std::string>>(std::move(Strings)));
-    return createCStringsRef(*OwnedStdStr.back());
-  }
 };
 
 struct DependencyGraph {
@@ -561,18 +580,19 @@ CXDiagnosticSet clang_experimental_DepGraph_getDiagnostics(CXDepGraph Graph) {
   return unwrap(Graph)->getDiagnosticSet();
 }
 
-CXStringSet *
+CXCStringArray
 clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
     CXDependencyScannerService S) {
-  DependencyScanningService *Service = unwrap(S);
+  DependencyScanningService &Service = unwrap(S)->Service;
+  CStringsManager &StrMgr = unwrap(S)->StrMgr;
 
   // FIXME: CAS currently does not use the shared cache, and cannot produce
   // the same diagnostics. We should add such a diagnostics to CAS as well.
-  if (Service->useCASFS())
-    return nullptr;
+  if (Service.useCASFS())
+    return {nullptr, 0};
 
   DependencyScanningFilesystemSharedCache &SharedCache =
-      Service->getSharedCache();
+      Service.getSharedCache();
 
   // Note that it is critical that this FS is the same as the default virtual
   // file system we pass to the DependencyScanningWorkers.
@@ -581,8 +601,7 @@ clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
 
   auto InvaidNegStatCachedPaths =
       SharedCache.getInvalidNegativeStatCachedPaths(*FS);
-  return cxstring::createSet(std::vector<std::string>(
-      InvaidNegStatCachedPaths.begin(), InvaidNegStatCachedPaths.end()));
+  return StrMgr.createCStringsRef(InvaidNegStatCachedPaths);
 }
 
 static std::string

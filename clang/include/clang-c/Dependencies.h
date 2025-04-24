@@ -586,7 +586,7 @@ CINDEX_LINKAGE
 CXDiagnosticSet clang_experimental_DepGraph_getDiagnostics(CXDepGraph);
 
 CINDEX_LINKAGE
-CXStringSet *
+CXCStringArray
     clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
         CXDependencyScannerService);
 

@@ -908,14 +908,12 @@ static int scanDeps(ArrayRef<const char *> Args, std::string WorkingDirectory,
     clang_disposeDiagnostic(Diag);
   }
 
-  CXStringSet *InvalidNegativeStatCachedPaths =
+  CXCStringArray InvalidNegativeStatCachedPaths =
       clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
           Service);
-  if (InvalidNegativeStatCachedPaths) {
-    llvm::errs() << "note: number of invalid negatively stat cached paths: "
-                 << InvalidNegativeStatCachedPaths->Count << "\n";
-    clang_disposeStringSet(InvalidNegativeStatCachedPaths);
-  }
+
+  llvm::errs() << "note: number of invalid negatively stat cached paths: "
+               << InvalidNegativeStatCachedPaths.Count << "\n";
 
   return 1;
 }
