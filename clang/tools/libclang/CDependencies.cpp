@@ -46,28 +46,14 @@ struct CStringsManager {
   SmallVector<std::unique_ptr<std::vector<const char *>>> OwnedCStr;
   SmallVector<std::unique_ptr<std::vector<std::string>>> OwnedStdStr;
 
-  template <typename StringTy>
-  CXCStringArray createCStringsRefImpl(
-      ArrayRef<StringTy> Strings,
-      std::function<const char *(const StringTy &)> strGetter) {
+  /// Doesn't own the string contents.
+  CXCStringArray createCStringsRef(ArrayRef<std::string> Strings) {
     OwnedCStr.push_back(std::make_unique<std::vector<const char *>>());
     std::vector<const char *> &CStrings = *OwnedCStr.back();
     CStrings.reserve(Strings.size());
     for (const auto &String : Strings)
-      CStrings.push_back(strGetter(String));
+      CStrings.push_back(String.c_str());
     return {CStrings.data(), CStrings.size()};
-  }
-
-  /// The two methods below create a CXCSringArray that does not own its
-  /// contents.
-  CXCStringArray createCStringsRef(ArrayRef<std::string> Strings) {
-    return createCStringsRefImpl<std::string>(
-        Strings, [](const std::string &String) { return String.c_str(); });
-  }
-
-  CXCStringArray createCStringsRef(ArrayRef<StringRef> Strings) {
-    return createCStringsRefImpl<StringRef>(
-        Strings, [](const StringRef &String) { return String.begin(); });
   }
 
   /// Doesn't own the string contents.
@@ -601,7 +587,15 @@ clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
 
   auto InvaidNegStatCachedPaths =
       SharedCache.getInvalidNegativeStatCachedPaths(*FS);
-  return StrMgr.createCStringsRef(InvaidNegStatCachedPaths);
+
+  // FIXME: This code here creates copies of strings from
+  // InvaidNegStatCachedPaths. It is acceptable because this C-API is expected
+  // to be called only at the end of a CXDependencyScannerService's lifetime.
+  // In other words, it is called very infrequently. We can change
+  // CStringsManager's interface to accommodate handling arbitrary StringRefs
+  // (which may not be null terminated) if we want to avoid copying.
+  return StrMgr.createCStringsOwned(
+      {InvaidNegStatCachedPaths.begin(), InvaidNegStatCachedPaths.end()});
 }
 
 static std::string
