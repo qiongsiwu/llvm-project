@@ -254,22 +254,22 @@ static CXErrorCode getFullDependencies(DependencyScanningWorker *Worker,
 #endif
 
   if (DiagConsumer) {
-    bool Result =
-        ModuleName ? Worker->computeDependencies(WorkingDirectory, Compilation,
-                                                 DepConsumer, *Controller,
-                                                 *DiagConsumer, *ModuleName)
-                   : Worker->computeDependencies(WorkingDirectory, Compilation,
-                                                 DepConsumer, *Controller,
-                                                 *DiagConsumer);
+    bool Result = ModuleName
+                      ? Worker->computeDependencies(
+                            WorkingDirectory, Compilation, DepConsumer,
+                            *Controller, *DiagConsumer, *ModuleName, nullptr)
+                      : Worker->computeDependencies(WorkingDirectory,
+                                                    Compilation, DepConsumer,
+                                                    *Controller, *DiagConsumer);
     if (!Result)
       return CXError_Failure;
   } else if (Error) {
     auto Result =
-        ModuleName
-            ? Worker->computeDependencies(WorkingDirectory, Compilation,
-                                          DepConsumer, *Controller, *ModuleName)
-            : Worker->computeDependencies(WorkingDirectory, Compilation,
-                                          DepConsumer, *Controller);
+        ModuleName ? Worker->computeDependencies(WorkingDirectory, Compilation,
+                                                 DepConsumer, *Controller,
+                                                 *ModuleName, nullptr)
+                   : Worker->computeDependencies(WorkingDirectory, Compilation,
+                                                 DepConsumer, *Controller);
     if (Result) {
       *Error = cxstring::createDup(llvm::toString(std::move(Result)));
       return CXError_Failure;

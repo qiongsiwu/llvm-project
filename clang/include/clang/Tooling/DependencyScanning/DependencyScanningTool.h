@@ -195,7 +195,8 @@ public:
   llvm::Expected<ModuleDepsGraph> getModuleDependencies(
       StringRef ModuleName, const std::vector<std::string> &CommandLine,
       StringRef CWD, const llvm::DenseSet<ModuleID> &AlreadySeen,
-      LookupModuleOutputCallback LookupModuleOutput);
+      LookupModuleOutputCallback LookupModuleOutput,
+      CompilerInstance *CI = nullptr);
 
   llvm::vfs::FileSystem &getWorkerVFS() const { return Worker.getVFS(); }
 

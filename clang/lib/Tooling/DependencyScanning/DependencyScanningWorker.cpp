@@ -402,14 +402,14 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
       bool DisableFree, bool EmitDependencyFile,
       bool DiagGenerationAsCompilation, const CASOptions &CASOpts,
-      std::optional<StringRef> ModuleName = std::nullopt,
+      CompilerInstance *CI, std::optional<StringRef> ModuleName = std::nullopt,
       raw_ostream *VerboseOS = nullptr)
-      : Service(Service), WorkingDirectory(WorkingDirectory), Consumer(Consumer),
-        Controller(Controller), DepFS(std::move(DepFS)),
+      : Service(Service), WorkingDirectory(WorkingDirectory),
+        Consumer(Consumer), Controller(Controller), DepFS(std::move(DepFS)),
         DepCASFS(std::move(DepCASFS)), CacheFS(std::move(CacheFS)),
-        DisableFree(DisableFree),
-        CASOpts(CASOpts), EmitDependencyFile(EmitDependencyFile),
-        DiagGenerationAsCompilation(DiagGenerationAsCompilation),
+        DisableFree(DisableFree), CASOpts(CASOpts),
+        EmitDependencyFile(EmitDependencyFile),
+        DiagGenerationAsCompilation(DiagGenerationAsCompilation), CI(CI),
         ModuleName(ModuleName), VerboseOS(VerboseOS) {}
 
   bool runInvocation(std::shared_ptr<CompilerInvocation> Invocation,
@@ -443,7 +443,7 @@ public:
     // Create a compiler instance to handle the actual work.
     auto ModCache = makeInProcessModuleCache(Service.getModuleCacheMutexes());
     ScanInstanceStorage.emplace(std::move(PCHContainerOps), ModCache.get());
-    CompilerInstance &ScanInstance = *ScanInstanceStorage;
+    CompilerInstance &ScanInstance = CI ? *CI : *ScanInstanceStorage;
     ScanInstance.setInvocation(std::move(Invocation));
     ScanInstance.getInvocation().getCASOpts() = CASOpts;
     ScanInstance.setBuildingModule(false);
@@ -684,6 +684,7 @@ public:
   const CASOptions &CASOpts;
   bool EmitDependencyFile = false;
   bool DiagGenerationAsCompilation;
+  CompilerInstance *CI = nullptr;
   std::optional<StringRef> ModuleName;
   std::optional<CompilerInstance> ScanInstanceStorage;
   std::shared_ptr<ModuleDepCollector> MDC;
@@ -767,7 +768,7 @@ llvm::Error DependencyScanningWorker::computeDependencies(
 llvm::Error DependencyScanningWorker::computeDependencies(
     StringRef WorkingDirectory, const std::vector<std::string> &CommandLine,
     DependencyConsumer &Consumer, DependencyActionController &Controller,
-    StringRef ModuleName) {
+    StringRef ModuleName, CompilerInstance *CI) {
   // Capture the emitted diagnostics and report them to the client
   // in the case of a failure.
   std::string DiagnosticOutput;
@@ -776,7 +777,7 @@ llvm::Error DependencyScanningWorker::computeDependencies(
   TextDiagnosticPrinter DiagPrinter(DiagnosticsOS, DiagOpts.release());
 
   if (computeDependencies(WorkingDirectory, CommandLine, Consumer, Controller,
-                          DiagPrinter, ModuleName))
+                          DiagPrinter, ModuleName, CI))
     return llvm::Error::success();
   return llvm::make_error<llvm::StringError>(DiagnosticsOS.str(),
                                              llvm::inconvertibleErrorCode());
@@ -847,7 +848,7 @@ bool DependencyScanningWorker::scanDependencies(
     StringRef WorkingDirectory, const std::vector<std::string> &CommandLine,
     DependencyConsumer &Consumer, DependencyActionController &Controller,
     DiagnosticConsumer &DC, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
-    std::optional<StringRef> ModuleName) {
+    std::optional<StringRef> ModuleName, CompilerInstance *CI) {
   auto FileMgr =
       llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOptions{}, FS);
 
@@ -868,12 +869,11 @@ bool DependencyScanningWorker::scanDependencies(
   // in-process; preserve the original value, which is
   // always true for a driver invocation.
   bool DisableFree = true;
-  DependencyScanningAction Action(Service, WorkingDirectory, Consumer, Controller, DepFS,
-                                  DepCASFS, CacheFS,
-                                  DisableFree,
-                                  /*EmitDependencyFile=*/false,
-                                  /*DiagGenerationAsCompilation=*/false, getCASOpts(),
-                                  ModuleName);
+  DependencyScanningAction Action(
+      Service, WorkingDirectory, Consumer, Controller, DepFS, DepCASFS, CacheFS,
+      DisableFree,
+      /*EmitDependencyFile=*/false,
+      /*DiagGenerationAsCompilation=*/false, getCASOpts(), CI, ModuleName);
   bool Success = false;
   if (CommandLine[1] == "-cc1") {
     Success = createAndRunToolInvocation(CommandLine, Action, *FileMgr,
@@ -959,13 +959,14 @@ bool DependencyScanningWorker::computeDependencies(
   auto &FinalFS = ModifiedFS ? ModifiedFS : BaseFS;
 
   return scanDependencies(WorkingDirectory, FinalCommandLine, Consumer,
-                          Controller, DC, FinalFS, /*ModuleName=*/std::nullopt);
+                          Controller, DC, FinalFS, /*ModuleName=*/std::nullopt,
+                          nullptr);
 }
 
 bool DependencyScanningWorker::computeDependencies(
     StringRef WorkingDirectory, const std::vector<std::string> &CommandLine,
     DependencyConsumer &Consumer, DependencyActionController &Controller,
-    DiagnosticConsumer &DC, StringRef ModuleName) {
+    DiagnosticConsumer &DC, StringRef ModuleName, CompilerInstance *CI) {
   // Reset what might have been modified in the previous worker invocation.
   BaseFS->setCurrentWorkingDirectory(WorkingDirectory);
 
@@ -993,7 +994,7 @@ bool DependencyScanningWorker::computeDependencies(
   ModifiedCommandLine.emplace_back(FakeInputPath);
 
   return scanDependencies(WorkingDirectory, ModifiedCommandLine, Consumer,
-                          Controller, DC, OverlayFS, ModuleName);
+                          Controller, DC, OverlayFS, ModuleName, CI);
 }
 
 DependencyActionController::~DependencyActionController() {}
@@ -1032,6 +1033,7 @@ void DependencyScanningWorker::computeDependenciesFromCompilerInvocation(
                                   /*DisableFree=*/false,
                                   /*EmitDependencyFile=*/!DepFile.empty(),
                                   DiagGenerationAsCompilation, getCASOpts(),
+                                  nullptr,
                                   /*ModuleName=*/std::nullopt, VerboseOS);
 
   // Ignore result; we're just collecting dependencies.

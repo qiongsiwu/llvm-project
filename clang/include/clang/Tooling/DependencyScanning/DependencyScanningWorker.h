@@ -147,7 +147,7 @@ public:
                            DependencyConsumer &DepConsumer,
                            DependencyActionController &Controller,
                            DiagnosticConsumer &DiagConsumer,
-                           StringRef ModuleName);
+                           StringRef ModuleName, CompilerInstance *CI);
 
   /// Run the dependency scanning tool for a given clang driver command-line
   /// for a specific translation unit via file system or memory buffer.
@@ -168,7 +168,7 @@ public:
                                   const std::vector<std::string> &CommandLine,
                                   DependencyConsumer &Consumer,
                                   DependencyActionController &Controller,
-                                  StringRef ModuleName);
+                                  StringRef ModuleName, CompilerInstance *CI);
 
   /// Scan from a compiler invocation.
   /// If \p DiagGenerationAsCompilation is true it will generate error
@@ -221,7 +221,8 @@ private:
                         DependencyActionController &Controller,
                         DiagnosticConsumer &DC,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
-                        std::optional<StringRef> ModuleName);
+                        std::optional<StringRef> ModuleName,
+                        CompilerInstance *CI);
 };
 
 } // end namespace dependencies
