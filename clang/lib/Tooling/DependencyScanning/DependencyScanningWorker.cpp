@@ -383,10 +383,11 @@ public:
       DependencyScanningService &Service, StringRef WorkingDirectory,
       DependencyConsumer &Consumer, DependencyActionController &Controller,
       llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS,
-      bool DisableFree, std::optional<StringRef> ModuleName = std::nullopt)
+      bool DisableFree, CompilerInstance *CI,
+      std::optional<StringRef> ModuleName = std::nullopt)
       : Service(Service), WorkingDirectory(WorkingDirectory),
         Consumer(Consumer), Controller(Controller), DepFS(std::move(DepFS)),
-        DisableFree(DisableFree), ModuleName(ModuleName) {}
+        DisableFree(DisableFree), ModuleName(ModuleName), CI(CI) {}
 
   bool runInvocation(std::shared_ptr<CompilerInvocation> Invocation,
                      FileManager *DriverFileMgr,
@@ -414,7 +415,7 @@ public:
     auto ModCache = makeInProcessModuleCache(Service.getModuleCacheMutexes());
     ScanInstanceStorage.emplace(std::move(Invocation),
                                 std::move(PCHContainerOps), ModCache.get());
-    CompilerInstance &ScanInstance = *ScanInstanceStorage;
+    CompilerInstance &ScanInstance = CI ? *CI : *ScanInstanceStorage;
     ScanInstance.setBuildingModule(false);
 
     // Create the compiler's actual diagnostics engine.
@@ -585,6 +586,7 @@ private:
   std::optional<CompilerInstance> ScanInstanceStorage;
   std::shared_ptr<ModuleDepCollector> MDC;
   std::vector<std::string> LastCC1Arguments;
+  CompilerInstance *CI = nullptr;
   bool Scanned = false;
   bool DiagConsumerFinished = false;
 };
@@ -649,7 +651,7 @@ llvm::Error DependencyScanningWorker::computeDependencies(
 llvm::Error DependencyScanningWorker::computeDependencies(
     StringRef WorkingDirectory, const std::vector<std::string> &CommandLine,
     DependencyConsumer &Consumer, DependencyActionController &Controller,
-    StringRef ModuleName) {
+    StringRef ModuleName, CompilerInstance *CI) {
   // Capture the emitted diagnostics and report them to the client
   // in the case of a failure.
   std::string DiagnosticOutput;
@@ -658,7 +660,7 @@ llvm::Error DependencyScanningWorker::computeDependencies(
   TextDiagnosticPrinter DiagPrinter(DiagnosticsOS, DiagOpts.release());
 
   if (computeDependencies(WorkingDirectory, CommandLine, Consumer, Controller,
-                          DiagPrinter, ModuleName))
+                          DiagPrinter, ModuleName, CI))
     return llvm::Error::success();
   return llvm::make_error<llvm::StringError>(DiagnosticsOS.str(),
                                              llvm::inconvertibleErrorCode());
@@ -728,7 +730,7 @@ bool DependencyScanningWorker::scanDependencies(
     StringRef WorkingDirectory, const std::vector<std::string> &CommandLine,
     DependencyConsumer &Consumer, DependencyActionController &Controller,
     DiagnosticConsumer &DC, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
-    std::optional<StringRef> ModuleName) {
+    std::optional<StringRef> ModuleName, CompilerInstance *CI) {
   auto FileMgr =
       llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOptions{}, FS);
 
@@ -751,7 +753,8 @@ bool DependencyScanningWorker::scanDependencies(
   // always true for a driver invocation.
   bool DisableFree = true;
   DependencyScanningAction Action(Service, WorkingDirectory, Consumer,
-                                  Controller, DepFS, DisableFree, ModuleName);
+                                  Controller, DepFS, DisableFree, CI,
+                                  ModuleName);
 
   bool Success = false;
   if (CommandLine[1] == "-cc1") {
@@ -831,13 +834,14 @@ bool DependencyScanningWorker::computeDependencies(
   auto &FinalFS = ModifiedFS ? ModifiedFS : BaseFS;
 
   return scanDependencies(WorkingDirectory, FinalCommandLine, Consumer,
-                          Controller, DC, FinalFS, /*ModuleName=*/std::nullopt);
+                          Controller, DC, FinalFS, /*ModuleName=*/std::nullopt,
+                          nullptr);
 }
 
 bool DependencyScanningWorker::computeDependencies(
     StringRef WorkingDirectory, const std::vector<std::string> &CommandLine,
     DependencyConsumer &Consumer, DependencyActionController &Controller,
-    DiagnosticConsumer &DC, StringRef ModuleName) {
+    DiagnosticConsumer &DC, StringRef ModuleName, CompilerInstance *CI) {
   // Reset what might have been modified in the previous worker invocation.
   BaseFS->setCurrentWorkingDirectory(WorkingDirectory);
 
@@ -860,7 +864,7 @@ bool DependencyScanningWorker::computeDependencies(
   ModifiedCommandLine.emplace_back(FakeInputPath);
 
   return scanDependencies(WorkingDirectory, ModifiedCommandLine, Consumer,
-                          Controller, DC, OverlayFS, ModuleName);
+                          Controller, DC, OverlayFS, ModuleName, CI);
 }
 
 DependencyActionController::~DependencyActionController() {}
