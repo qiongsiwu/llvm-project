@@ -442,3 +442,33 @@ TEST(DependencyScanner, ScanDepsWithDiagConsumer) {
     EXPECT_TRUE(DiagConsumer.Finished);
   }
 }
+
+TEST(DependencyScanner, DiagnoseStaleStatFailuresCAS) {
+  std::shared_ptr<ObjectStore> DB = llvm::cas::createInMemoryCAS();
+  auto FS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  FS->setCurrentWorkingDirectory("/root");
+  // StringRef Path = "a.h";
+  // StringRef Contents = "a";
+  // FS->addFile(Path, 0, llvm::MemoryBuffer::getMemBuffer(Contents));
+  std::unique_ptr<llvm::vfs::FileSystem> CASFS =
+      llvm::cas::createCASProvidingFileSystem(DB, FS);
+
+  DependencyScanningService Service(ScanningMode::DependencyDirectivesScan,
+                                    ScanningOutputFormat::Make, CASOptions(),
+                                    nullptr, nullptr, nullptr);
+  DependencyScanningWorkerFilesystem DepFS(Service.getSharedCache(),
+                                           std::move(CASFS));
+
+  bool Path1Exists = DepFS.exists("/path1.suffix");
+  EXPECT_EQ(Path1Exists, false);
+
+  FS->addFile("/path1.suffix", 0, llvm::MemoryBuffer::getMemBuffer(""));
+  Path1Exists = DepFS.exists("/path1.suffix");
+  EXPECT_EQ(Path1Exists, false);
+
+  std::vector<llvm::StringRef> InvalidPaths =
+      Service.getSharedCache().getInvalidNegativeStatCachedPaths(*FS.get());
+
+  EXPECT_EQ(InvalidPaths.size(), 1u);
+  ASSERT_STREQ("/path1.suffix", InvalidPaths[0].str().c_str());
+}
