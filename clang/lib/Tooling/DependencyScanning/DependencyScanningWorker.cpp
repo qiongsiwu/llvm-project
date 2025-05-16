@@ -375,6 +375,128 @@ public:
   }
 };
 
+static bool initializeCompilerInstanceForScanningByName(
+    CompilerInstance &ScanInstance, std::shared_ptr<ModuleDepCollector> &MDC,
+    FileManager *DriverFileMgr, DiagnosticConsumer *DiagConsumer,
+    DependencyScanningService &Service,
+    llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS,
+    StringRef WorkingDirectory, DependencyConsumer &Consumer,
+    DependencyActionController &Controller,
+    CompilerInvocation &OriginalInvocation) {
+  ScanInstance.setBuildingModule(false);
+
+  // Create the compiler's actual diagnostics engine.
+  sanitizeDiagOpts(ScanInstance.getDiagnosticOpts());
+  //assert(!DiagConsumerFinished && "attempt to reuse finished consumer");
+  ScanInstance.createDiagnostics(DriverFileMgr->getVirtualFileSystem(),
+                                 DiagConsumer, /*ShouldOwnClient=*/false);
+  if (!ScanInstance.hasDiagnostics())
+    return false;
+
+  ScanInstance.getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
+      true;
+
+  ScanInstance.getFrontendOpts().GenerateGlobalModuleIndex = false;
+  ScanInstance.getFrontendOpts().UseGlobalModuleIndex = false;
+  // This will prevent us compiling individual modules asynchronously since
+  // FileManager is not thread-safe, but it does improve performance for now.
+  ScanInstance.getFrontendOpts().ModulesShareFileManager = true;
+  ScanInstance.getHeaderSearchOpts().ModuleFormat = "raw";
+  ScanInstance.getHeaderSearchOpts().ModulesIncludeVFSUsage =
+      any(Service.getOptimizeArgs() & ScanningOptimizations::VFS);
+
+  // Support for virtual file system overlays.
+  auto FS = createVFSFromCompilerInvocation(
+      ScanInstance.getInvocation(), ScanInstance.getDiagnostics(),
+      DriverFileMgr->getVirtualFileSystemPtr());
+
+  // Create a new FileManager to match the invocation's FileSystemOptions.
+  auto *FileMgr = ScanInstance.createFileManager(FS);
+
+  // Use the dependency scanning optimized file system if requested to do so.
+  if (DepFS) {
+    StringRef ModulesCachePath =
+        ScanInstance.getHeaderSearchOpts().ModuleCachePath;
+
+    DepFS->resetBypassedPathPrefix();
+    if (!ModulesCachePath.empty())
+      DepFS->setBypassedPathPrefix(ModulesCachePath);
+
+    ScanInstance.setDependencyDirectivesGetter(
+        std::make_unique<ScanningDependencyDirectivesGetter>(*FileMgr));
+  }
+
+  ScanInstance.createSourceManager(*FileMgr);
+
+  // Create a collection of stable directories derived from the ScanInstance
+  // for determining whether module dependencies would fully resolve from
+  // those directories.
+  llvm::SmallVector<StringRef> StableDirs;
+  const StringRef Sysroot = ScanInstance.getHeaderSearchOpts().Sysroot;
+  if (!Sysroot.empty() && (llvm::sys::path::root_directory(Sysroot) != Sysroot))
+    StableDirs = {Sysroot, ScanInstance.getHeaderSearchOpts().ResourceDir};
+
+  // Store a mapping of prebuilt module files and their properties like header
+  // search options. This will prevent the implicit build to create duplicate
+  // modules and will force reuse of the existing prebuilt module files
+  // instead.
+  PrebuiltModulesAttrsMap PrebuiltModulesASTMap;
+
+  if (!ScanInstance.getPreprocessorOpts().ImplicitPCHInclude.empty())
+    if (visitPrebuiltModule(
+            ScanInstance.getPreprocessorOpts().ImplicitPCHInclude, ScanInstance,
+            ScanInstance.getHeaderSearchOpts().PrebuiltModuleFiles,
+            PrebuiltModulesASTMap, ScanInstance.getDiagnostics(), StableDirs))
+      return false;
+
+  // Create the dependency collector that will collect the produced
+  // dependencies.
+  //
+  // This also moves the existing dependency output options from the
+  // invocation to the collector. The options in the invocation are reset,
+  // which ensures that the compiler won't create new dependency collectors,
+  // and thus won't write out the extra '.d' files to disk.
+  auto Opts = std::make_unique<DependencyOutputOptions>();
+  std::swap(*Opts, ScanInstance.getInvocation().getDependencyOutputOpts());
+  // We need at least one -MT equivalent for the generator of make dependency
+  // files to work.
+  if (Opts->Targets.empty())
+    Opts->Targets = {deduceDepTarget(ScanInstance.getFrontendOpts().OutputFile,
+                                     ScanInstance.getFrontendOpts().Inputs)};
+  Opts->IncludeSystemHeaders = true;
+
+  switch (Service.getFormat()) {
+  case ScanningOutputFormat::Make:
+    ScanInstance.addDependencyCollector(
+        std::make_shared<DependencyConsumerForwarder>(
+            std::move(Opts), WorkingDirectory, Consumer));
+    break;
+  case ScanningOutputFormat::P1689:
+  case ScanningOutputFormat::Full:
+    MDC = std::make_shared<ModuleDepCollector>(
+        Service, std::move(Opts), ScanInstance, Consumer, Controller,
+        OriginalInvocation, std::move(PrebuiltModulesASTMap), StableDirs);
+    ScanInstance.addDependencyCollector(MDC);
+    break;
+  }
+
+  // Consider different header search and diagnostic options to create
+  // different modules. This avoids the unsound aliasing of module PCMs.
+  //
+  // TODO: Implement diagnostic bucketing to reduce the impact of strict
+  // context hashing.
+  ScanInstance.getHeaderSearchOpts().ModulesStrictContextHash = true;
+  ScanInstance.getHeaderSearchOpts().ModulesSerializeOnlyPreprocessor = true;
+  ScanInstance.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
+  ScanInstance.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
+  ScanInstance.getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings = true;
+
+  // Avoid some checks and module map parsing when loading PCM files.
+  ScanInstance.getPreprocessorOpts().ModulesCheckRelocated = false;
+
+  return true;
+}
+
 /// A clang tool that runs the preprocessor in a mode that's optimized for
 /// dependency scanning for the given compiler invocation.
 class DependencyScanningAction : public tooling::ToolAction {
@@ -412,124 +534,133 @@ public:
     Scanned = true;
 
     // Create a compiler instance to handle the actual work.
-    auto ModCache = makeInProcessModuleCache(Service.getModuleCacheMutexes());
-    ScanInstanceStorage.emplace(std::move(Invocation),
-                                std::move(PCHContainerOps), ModCache.get());
-    CompilerInstance &ScanInstance = CI ? *CI : *ScanInstanceStorage;
-    ScanInstance.setBuildingModule(false);
+    if (!CI) {
+      auto ModCache = makeInProcessModuleCache(Service.getModuleCacheMutexes());
+      ScanInstanceStorage.emplace(std::move(Invocation),
+                                  std::move(PCHContainerOps), ModCache.get());
+    }
 
-    // Create the compiler's actual diagnostics engine.
-    sanitizeDiagOpts(ScanInstance.getDiagnosticOpts());
-    assert(!DiagConsumerFinished && "attempt to reuse finished consumer");
-    ScanInstance.createDiagnostics(DriverFileMgr->getVirtualFileSystem(),
-                                   DiagConsumer, /*ShouldOwnClient=*/false);
-    if (!ScanInstance.hasDiagnostics())
+    CompilerInstance &ScanInstance = CI ? *CI : *ScanInstanceStorage;
+
+    if (!initializeCompilerInstanceForScanningByName(
+            ScanInstance, MDC, DriverFileMgr, DiagConsumer, Service, DepFS,
+            WorkingDirectory, Consumer, Controller, OriginalInvocation))
       return false;
 
-    ScanInstance.getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
-        true;
+    // ScanInstance.setBuildingModule(false);
 
-    ScanInstance.getFrontendOpts().GenerateGlobalModuleIndex = false;
-    ScanInstance.getFrontendOpts().UseGlobalModuleIndex = false;
-    // This will prevent us compiling individual modules asynchronously since
-    // FileManager is not thread-safe, but it does improve performance for now.
-    ScanInstance.getFrontendOpts().ModulesShareFileManager = true;
-    ScanInstance.getHeaderSearchOpts().ModuleFormat = "raw";
-    ScanInstance.getHeaderSearchOpts().ModulesIncludeVFSUsage =
-        any(Service.getOptimizeArgs() & ScanningOptimizations::VFS);
+    // // Create the compiler's actual diagnostics engine.
+    // sanitizeDiagOpts(ScanInstance.getDiagnosticOpts());
+    // assert(!DiagConsumerFinished && "attempt to reuse finished consumer");
+    // ScanInstance.createDiagnostics(DriverFileMgr->getVirtualFileSystem(),
+    //                                DiagConsumer, /*ShouldOwnClient=*/false);
+    // if (!ScanInstance.hasDiagnostics())
+    //   return false;
 
-    // Support for virtual file system overlays.
-    auto FS = createVFSFromCompilerInvocation(
-        ScanInstance.getInvocation(), ScanInstance.getDiagnostics(),
-        DriverFileMgr->getVirtualFileSystemPtr());
+    // ScanInstance.getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath =
+    //     true;
 
-    // Create a new FileManager to match the invocation's FileSystemOptions.
-    auto *FileMgr = ScanInstance.createFileManager(FS);
+    // ScanInstance.getFrontendOpts().GenerateGlobalModuleIndex = false;
+    // ScanInstance.getFrontendOpts().UseGlobalModuleIndex = false;
+    // // This will prevent us compiling individual modules asynchronously since
+    // // FileManager is not thread-safe, but it does improve performance for now.
+    // ScanInstance.getFrontendOpts().ModulesShareFileManager = true;
+    // ScanInstance.getHeaderSearchOpts().ModuleFormat = "raw";
+    // ScanInstance.getHeaderSearchOpts().ModulesIncludeVFSUsage =
+    //     any(Service.getOptimizeArgs() & ScanningOptimizations::VFS);
 
-    // Use the dependency scanning optimized file system if requested to do so.
-    if (DepFS) {
-      StringRef ModulesCachePath =
-          ScanInstance.getHeaderSearchOpts().ModuleCachePath;
+    // // Support for virtual file system overlays.
+    // auto FS = createVFSFromCompilerInvocation(
+    //     ScanInstance.getInvocation(), ScanInstance.getDiagnostics(),
+    //     DriverFileMgr->getVirtualFileSystemPtr());
 
-      DepFS->resetBypassedPathPrefix();
-      if (!ModulesCachePath.empty())
-        DepFS->setBypassedPathPrefix(ModulesCachePath);
+    // // Create a new FileManager to match the invocation's FileSystemOptions.
+    // auto *FileMgr = ScanInstance.createFileManager(FS);
 
-      ScanInstance.setDependencyDirectivesGetter(
-          std::make_unique<ScanningDependencyDirectivesGetter>(*FileMgr));
-    }
+    // // Use the dependency scanning optimized file system if requested to do so.
+    // if (DepFS) {
+    //   StringRef ModulesCachePath =
+    //       ScanInstance.getHeaderSearchOpts().ModuleCachePath;
 
-    ScanInstance.createSourceManager(*FileMgr);
+    //   DepFS->resetBypassedPathPrefix();
+    //   if (!ModulesCachePath.empty())
+    //     DepFS->setBypassedPathPrefix(ModulesCachePath);
 
-    // Create a collection of stable directories derived from the ScanInstance
-    // for determining whether module dependencies would fully resolve from
-    // those directories.
-    llvm::SmallVector<StringRef> StableDirs;
-    const StringRef Sysroot = ScanInstance.getHeaderSearchOpts().Sysroot;
-    if (!Sysroot.empty() &&
-        (llvm::sys::path::root_directory(Sysroot) != Sysroot))
-      StableDirs = {Sysroot, ScanInstance.getHeaderSearchOpts().ResourceDir};
+    //   ScanInstance.setDependencyDirectivesGetter(
+    //       std::make_unique<ScanningDependencyDirectivesGetter>(*FileMgr));
+    // }
 
-    // Store a mapping of prebuilt module files and their properties like header
-    // search options. This will prevent the implicit build to create duplicate
-    // modules and will force reuse of the existing prebuilt module files
-    // instead.
-    PrebuiltModulesAttrsMap PrebuiltModulesASTMap;
+    // ScanInstance.createSourceManager(*FileMgr);
 
-    if (!ScanInstance.getPreprocessorOpts().ImplicitPCHInclude.empty())
-      if (visitPrebuiltModule(
-              ScanInstance.getPreprocessorOpts().ImplicitPCHInclude,
-              ScanInstance,
-              ScanInstance.getHeaderSearchOpts().PrebuiltModuleFiles,
-              PrebuiltModulesASTMap, ScanInstance.getDiagnostics(), StableDirs))
-        return false;
+    // // Create a collection of stable directories derived from the ScanInstance
+    // // for determining whether module dependencies would fully resolve from
+    // // those directories.
+    // llvm::SmallVector<StringRef> StableDirs;
+    // const StringRef Sysroot = ScanInstance.getHeaderSearchOpts().Sysroot;
+    // if (!Sysroot.empty() &&
+    //     (llvm::sys::path::root_directory(Sysroot) != Sysroot))
+    //   StableDirs = {Sysroot, ScanInstance.getHeaderSearchOpts().ResourceDir};
 
-    // Create the dependency collector that will collect the produced
-    // dependencies.
-    //
-    // This also moves the existing dependency output options from the
-    // invocation to the collector. The options in the invocation are reset,
-    // which ensures that the compiler won't create new dependency collectors,
-    // and thus won't write out the extra '.d' files to disk.
-    auto Opts = std::make_unique<DependencyOutputOptions>();
-    std::swap(*Opts, ScanInstance.getInvocation().getDependencyOutputOpts());
-    // We need at least one -MT equivalent for the generator of make dependency
-    // files to work.
-    if (Opts->Targets.empty())
-      Opts->Targets = {
-          deduceDepTarget(ScanInstance.getFrontendOpts().OutputFile,
-                          ScanInstance.getFrontendOpts().Inputs)};
-    Opts->IncludeSystemHeaders = true;
+    // // Store a mapping of prebuilt module files and their properties like header
+    // // search options. This will prevent the implicit build to create duplicate
+    // // modules and will force reuse of the existing prebuilt module files
+    // // instead.
+    // PrebuiltModulesAttrsMap PrebuiltModulesASTMap;
 
-    switch (Service.getFormat()) {
-    case ScanningOutputFormat::Make:
-      ScanInstance.addDependencyCollector(
-          std::make_shared<DependencyConsumerForwarder>(
-              std::move(Opts), WorkingDirectory, Consumer));
-      break;
-    case ScanningOutputFormat::P1689:
-    case ScanningOutputFormat::Full:
-      MDC = std::make_shared<ModuleDepCollector>(
-          Service, std::move(Opts), ScanInstance, Consumer, Controller,
-          OriginalInvocation, std::move(PrebuiltModulesASTMap), StableDirs);
-      ScanInstance.addDependencyCollector(MDC);
-      break;
-    }
+    // if (!ScanInstance.getPreprocessorOpts().ImplicitPCHInclude.empty())
+    //   if (visitPrebuiltModule(
+    //           ScanInstance.getPreprocessorOpts().ImplicitPCHInclude,
+    //           ScanInstance,
+    //           ScanInstance.getHeaderSearchOpts().PrebuiltModuleFiles,
+    //           PrebuiltModulesASTMap, ScanInstance.getDiagnostics(), StableDirs))
+    //     return false;
 
-    // Consider different header search and diagnostic options to create
-    // different modules. This avoids the unsound aliasing of module PCMs.
-    //
-    // TODO: Implement diagnostic bucketing to reduce the impact of strict
-    // context hashing.
-    ScanInstance.getHeaderSearchOpts().ModulesStrictContextHash = true;
-    ScanInstance.getHeaderSearchOpts().ModulesSerializeOnlyPreprocessor = true;
-    ScanInstance.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
-    ScanInstance.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
-    ScanInstance.getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
-        true;
+    // // Create the dependency collector that will collect the produced
+    // // dependencies.
+    // //
+    // // This also moves the existing dependency output options from the
+    // // invocation to the collector. The options in the invocation are reset,
+    // // which ensures that the compiler won't create new dependency collectors,
+    // // and thus won't write out the extra '.d' files to disk.
+    // auto Opts = std::make_unique<DependencyOutputOptions>();
+    // std::swap(*Opts, ScanInstance.getInvocation().getDependencyOutputOpts());
+    // // We need at least one -MT equivalent for the generator of make dependency
+    // // files to work.
+    // if (Opts->Targets.empty())
+    //   Opts->Targets = {
+    //       deduceDepTarget(ScanInstance.getFrontendOpts().OutputFile,
+    //                       ScanInstance.getFrontendOpts().Inputs)};
+    // Opts->IncludeSystemHeaders = true;
 
-    // Avoid some checks and module map parsing when loading PCM files.
-    ScanInstance.getPreprocessorOpts().ModulesCheckRelocated = false;
+    // switch (Service.getFormat()) {
+    // case ScanningOutputFormat::Make:
+    //   ScanInstance.addDependencyCollector(
+    //       std::make_shared<DependencyConsumerForwarder>(
+    //           std::move(Opts), WorkingDirectory, Consumer));
+    //   break;
+    // case ScanningOutputFormat::P1689:
+    // case ScanningOutputFormat::Full:
+    //   MDC = std::make_shared<ModuleDepCollector>(
+    //       Service, std::move(Opts), ScanInstance, Consumer, Controller,
+    //       OriginalInvocation, std::move(PrebuiltModulesASTMap), StableDirs);
+    //   ScanInstance.addDependencyCollector(MDC);
+    //   break;
+    // }
+
+    // // Consider different header search and diagnostic options to create
+    // // different modules. This avoids the unsound aliasing of module PCMs.
+    // //
+    // // TODO: Implement diagnostic bucketing to reduce the impact of strict
+    // // context hashing.
+    // ScanInstance.getHeaderSearchOpts().ModulesStrictContextHash = true;
+    // ScanInstance.getHeaderSearchOpts().ModulesSerializeOnlyPreprocessor = true;
+    // ScanInstance.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = true;
+    // ScanInstance.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = true;
+    // ScanInstance.getHeaderSearchOpts().ModulesSkipPragmaDiagnosticMappings =
+    //     true;
+
+    // // Avoid some checks and module map parsing when loading PCM files.
+    // ScanInstance.getPreprocessorOpts().ModulesCheckRelocated = false;
 
     std::unique_ptr<FrontendAction> Action;
 
