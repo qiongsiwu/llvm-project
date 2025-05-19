@@ -547,7 +547,29 @@ public:
     if (ScanInstance.getDiagnostics().hasErrorOccurred())
       return false;
 
-    const bool Result = ScanInstance.ExecuteAction(*Action);
+    bool Result = false;
+    if (ModuleName) {
+      auto InputFile = ScanInstance.getFrontendOpts().Inputs.begin();
+      ScanInstance.createTarget();
+      Action->BeginSourceFile(ScanInstance, *InputFile);
+      Preprocessor &PP = ScanInstance.getPreprocessor();
+      SourceManager &SM = PP.getSourceManager();
+      FileID MainFileID = SM.getMainFileID();
+      SourceLocation FileStart = SM.getLocForStartOfFile(MainFileID);
+      SmallVector<IdentifierLoc, 2> Path;
+      IdentifierInfo *ModuleID = PP.getIdentifierInfo(*ModuleName);
+      Path.emplace_back(FileStart, ModuleID);
+      auto ModResult =
+          ScanInstance.loadModule(FileStart, Path, Module::Hidden, false);
+      PPCallbacks *CB = PP.getPPCallbacks();
+      CB->moduleImport(SourceLocation(), Path, ModResult);
+      CB->EndOfMainFile();
+      Result = true;
+    } else {
+      Result = ScanInstance.ExecuteAction(*Action);
+    }
+
+    // const bool Result = ScanInstance.ExecuteAction(*Action);
 
     // ExecuteAction is responsible for calling finish.
     DiagConsumerFinished = true;
@@ -757,7 +779,6 @@ bool DependencyScanningWorker::scanDependencies(
   bool DisableFree = true;
   DependencyScanningAction Action(Service, WorkingDirectory, Consumer,
                                   Controller, DepFS, DisableFree, ModuleName);
-
   bool Success = false;
   if (CommandLine[1] == "-cc1") {
     Success = createAndRunToolInvocation(CommandLine, Action, *FileMgr,

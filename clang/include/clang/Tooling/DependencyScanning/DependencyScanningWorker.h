@@ -136,6 +136,21 @@ public:
 
   llvm::vfs::FileSystem &getVFS() const { return *BaseFS; }
 
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getVFSPtr() const {
+    return BaseFS;
+  }
+
+  std::shared_ptr<PCHContainerOperations> getPCHContainerOps() const {
+    return PCHContainerOps;
+  }
+
+  DependencyScanningService &getService() { return Service; }
+
+  llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem>
+  getDepFS() const {
+    return DepFS;
+  }
+
 private:
   /// The parent dependency scanning service.
   DependencyScanningService &Service;
