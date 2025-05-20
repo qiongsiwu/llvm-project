@@ -292,8 +292,8 @@ static CXErrorCode getFullDependencies(DependencyScanningWorker *Worker,
       MD.forEachFileDep([&](StringRef File) { FileDeps.emplace_back(File); });
       M.FileDeps = cxstring::createSet(FileDeps);
       std::vector<std::string> Modules;
-      for (const auto &DepInfo : MD.ClangModuleDeps)
-        Modules.push_back(DepInfo.ID.ModuleName + ":" + DepInfo.ID.ContextHash);
+      for (ModuleID &MID : MD.ClangModuleDeps)
+        Modules.push_back(MID.ModuleName + ":" + MID.ContextHash);
       M.ModuleDeps = cxstring::createSet(Modules);
       M.BuildArguments = cxstring::createSet(MD.getBuildArguments());
     }
@@ -622,8 +622,8 @@ clang_experimental_DepGraphModule_getModuleDeps(CXDepGraphModule CXDepMod) {
   const ModuleDeps &ModDeps = *unwrap(CXDepMod)->ModDeps;
   std::vector<std::string> Modules;
   Modules.reserve(ModDeps.ClangModuleDeps.size());
-  for (const auto &DepInfo : ModDeps.ClangModuleDeps)
-    Modules.push_back(DepInfo.ID.ModuleName + ":" + DepInfo.ID.ContextHash);
+  for (const ModuleID &MID : ModDeps.ClangModuleDeps)
+    Modules.push_back(MID.ModuleName + ":" + MID.ContextHash);
   return unwrap(CXDepMod)->StrMgr.createCStringsOwned(std::move(Modules));
 }
 
