@@ -9,6 +9,8 @@
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "CachingActions.h"
 #include "clang/Basic/DiagnosticSerialization.h"
+#include "clang/Basic/DiagnosticCAS.h"
+#include "clang/Frontend/MultiplexConsumer.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
@@ -18,6 +20,7 @@
 #include "clang/Frontend/Utils.h"
 #include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/TargetParser/Host.h"
 #include <optional>
 
@@ -504,6 +507,60 @@ deduceDepTarget(const std::string &OutputFile,
 
   return makeObjFileName(InputFiles.front().getFile());
 }
+
+class WrapScanModuleBuildConsumer : public ASTConsumer {
+public:
+  WrapScanModuleBuildConsumer(CompilerInstance &CI,
+                              DependencyActionController &Controller)
+      : CI(CI), Controller(Controller) {}
+
+  void HandleTranslationUnit(ASTContext &Ctx) override {
+    if (auto E = Controller.finalizeModuleBuild(CI))
+      Ctx.getDiagnostics().Report(diag::err_cas_depscan_failed) << std::move(E);
+  }
+
+private:
+  CompilerInstance &CI;
+  DependencyActionController &Controller;
+};
+
+class WrapScanModuleBuildAction : public WrapperFrontendAction {
+public:
+  WrapScanModuleBuildAction(std::unique_ptr<FrontendAction> WrappedAction,
+                            DependencyActionController &Controller)
+      : WrapperFrontendAction(std::move(WrappedAction)),
+        Controller(Controller) {}
+
+private:
+  bool BeginInvocation(CompilerInstance &CI) override {
+    if (auto E = Controller.initializeModuleBuild(CI)) {
+      CI.getDiagnostics().Report(diag::err_cas_depscan_failed) << std::move(E);
+      return false;
+    }
+    return WrapperFrontendAction::BeginInvocation(CI);
+  }
+
+  std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
+                                                 StringRef InFile) override {
+    auto OtherConsumer = WrapperFrontendAction::CreateASTConsumer(CI, InFile);
+    if (!OtherConsumer)
+      return nullptr;
+    Module *M = CI.getPreprocessor().getCurrentModule();
+    assert(M && "WrapScanModuleBuildAction should only be used with module");
+    if (!M)
+      return OtherConsumer;
+    auto Consumer =
+        std::make_unique<WrapScanModuleBuildConsumer>(CI, Controller);
+    std::vector<std::unique_ptr<ASTConsumer>> Consumers;
+    Consumers.push_back(std::move(Consumer));
+    Consumers.push_back(std::move(OtherConsumer));
+    return std::make_unique<MultiplexConsumer>(std::move(Consumers));
+  }
+
+private:
+  DependencyActionController &Controller;
+};
+
 ////////////////////////////////////////////////////////////////////////////
 
 llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
@@ -512,10 +569,11 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
     LookupModuleOutputCallback LookupModuleOutput) {
   FullDependencyConsumer Consumer(AlreadySeen);
   auto Controller = createActionController(LookupModuleOutput);
-  //llvm::Error Result = Worker.computeDependencies(CWD, CommandLine, Consumer,
+  // llvm::Error Result = Worker.computeDependencies(CWD, CommandLine, Consumer,
   //                                                *Controller, ModuleName);
-  //if (Result)
+  // if (Result)
   //  return std::move(Result);
+  // return Consumer.takeModuleGraphDeps();
 
   ////////////////////////////////////////////////////////////////////////////
   // Try initialize the compiler instance and eveyrthing else directly here.
@@ -540,6 +598,11 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
                                   /*MakeAbsolute=*/false);
   InMemoryFS->addFile(FakeInputPath, 0, llvm::MemoryBuffer::getMemBuffer(""));
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> InMemoryOverlay = InMemoryFS;
+  auto CAS = Worker.getCAS();
+  if (CAS && !Worker.getCASFSPtr()) {
+    InMemoryOverlay =
+        llvm::cas::createCASProvidingFileSystem(CAS, std::move(InMemoryFS));
+  }
   OverlayFS->pushOverlay(InMemoryOverlay);
   // - FileManager
   auto FileMgr =
@@ -560,6 +623,8 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(DiagOpts2.release(), &DiagPrinter,
                                           /*ShouldOwnClient=*/false);
+  SourceManager SrcMgr(*Diags, *FileMgr);
+  Diags->setSourceManager(&SrcMgr);
 
   // - CompilerInvocation
   // 1. Takes the commandline and turns it into a compilation from driver.
@@ -598,7 +663,8 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
   // Might as well set them here correctly.
   Invocation->getFrontendOpts().DisableFree = true;
   Invocation->getCodeGenOpts().DisableFree = true;
-  canonicalizeDefines(Invocation->getPreprocessorOpts());
+  if (any(Worker.getService().getOptimizeArgs() & ScanningOptimizations::Macros))
+    canonicalizeDefines(Invocation->getPreprocessorOpts());
   // -> CompilerInstance
   CompilerInvocation CICopy(*Invocation);
   auto ModCache =
@@ -610,7 +676,10 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
 
   // Now initialize the compiler instance.
   // Set hardcoded flags.
+  CI.getInvocation().getCASOpts() = Worker.getCASOpts();
   CI.setBuildingModule(false);
+  sanitizeDiagOpts(CI.getDiagnosticOpts());
+  CI.createDiagnostics(&DiagPrinter, false);
   CI.getPreprocessorOpts().AllowPCHWithDifferentModulesCachePath = true;
   CI.getFrontendOpts().GenerateGlobalModuleIndex = false;
   CI.getFrontendOpts().UseGlobalModuleIndex = false;
@@ -635,8 +704,8 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
   auto FS =
       createVFSFromCompilerInvocation(CI.getInvocation(), CI.getDiagnostics(),
                                       FileMgr->getVirtualFileSystemPtr());
-  CI.createFileManager(FS);
-  CI.createSourceManager(*FileMgr);
+  auto *FileMgr1 = CI.createFileManager(FS);
+  CI.createSourceManager(*FileMgr1);
   auto DepFS = Worker.getDepFS();
   if (DepFS) {
     CI.getPreprocessorOpts().DependencyDirectivesForFile =
@@ -684,10 +753,22 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
       std::move(PrebuiltModuleVFSMap));
 
   CI.addDependencyCollector(MDC);
+  CI.setGenModuleActionWrapper(
+      [&Controller = *Controller](const FrontendOptions &Opts,
+                                 std::unique_ptr<FrontendAction> Wrapped) {
+        return std::make_unique<WrapScanModuleBuildAction>(std::move(Wrapped),
+                                                           Controller);
+      });
+  if (Error E = Controller->initialize(CI, CICopy)) {
+    return llvm::make_error<llvm::StringError>("Controller setup error",
+                                               llvm::inconvertibleErrorCode());
+  }
+
   std::unique_ptr<FrontendAction> Action =
       std::make_unique<GetDependenciesByModuleNameAction>(ModuleName);
   auto InputFile = CI.getFrontendOpts().Inputs.begin();
   CI.createTarget();
+  CI.initializeDelayedInputFileFromCAS();
   Action->BeginSourceFile(CI, *InputFile);
   Preprocessor &PP = CI.getPreprocessor();
   SourceManager &SM = PP.getSourceManager();
@@ -701,7 +782,23 @@ llvm::Expected<ModuleDepsGraph> DependencyScanningTool::getModuleDependencies(
   PPCallbacks *CB = PP.getPPCallbacks();
   CB->moduleImport(SourceLocation(), Path, ModResult);
   CB->EndOfMainFile();
-  
+
+  MDC->applyDiscoveredDependencies(CICopy);
+
+  if (Error E = Controller->finalize(CI, CICopy)) {
+    return llvm::make_error<llvm::StringError>("Controller finalize error",
+                                               llvm::inconvertibleErrorCode());
+  }
+
+  DiagPrinter.finish();
+
+  std::string ID = CICopy.getFileSystemOpts().CASFileSystemRootID;
+  if (!ID.empty())
+    Consumer.handleCASFileSystemRootID(std::move(ID));
+  ID = CICopy.getFrontendOpts().CASIncludeTreeID;
+  if (!ID.empty())
+    Consumer.handleIncludeTreeID(std::move(ID));
+
   return Consumer.takeModuleGraphDeps();
   ////////////////////////////////////////////////////////////////////////////
 }

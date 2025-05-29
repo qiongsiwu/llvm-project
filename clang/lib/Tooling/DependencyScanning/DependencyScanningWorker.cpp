@@ -616,27 +616,28 @@ public:
     if (ScanInstance.getDiagnostics().hasErrorOccurred())
       return false;
 
-    bool Result = false;
-    if (ModuleName) {
-      auto InputFile = ScanInstance.getFrontendOpts().Inputs.begin();
-      ScanInstance.createTarget();
-      Action->BeginSourceFile(ScanInstance, *InputFile);
-      Preprocessor &PP = ScanInstance.getPreprocessor();
-      SourceManager &SM = PP.getSourceManager();
-      FileID MainFileID = SM.getMainFileID();
-      SourceLocation FileStart = SM.getLocForStartOfFile(MainFileID);
-      SmallVector<std::pair<IdentifierInfo *, SourceLocation>, 2> Path;
-      IdentifierInfo *ModuleID = PP.getIdentifierInfo(*ModuleName);
-      Path.push_back(std::make_pair(ModuleID, FileStart));
-      auto ModResult =
-          ScanInstance.loadModule(FileStart, Path, Module::Hidden, false);
-      PPCallbacks *CB = PP.getPPCallbacks();
-      CB->moduleImport(SourceLocation(), Path, ModResult);
-      CB->EndOfMainFile();
-      Result = true;
-    } else {
-      Result = ScanInstance.ExecuteAction(*Action);
-    }
+    //bool Result = false;
+    const bool Result = ScanInstance.ExecuteAction(*Action);
+    // if (ModuleName) {
+    //   auto InputFile = ScanInstance.getFrontendOpts().Inputs.begin();
+    //   ScanInstance.createTarget();
+    //   Action->BeginSourceFile(ScanInstance, *InputFile);
+    //   Preprocessor &PP = ScanInstance.getPreprocessor();
+    //   SourceManager &SM = PP.getSourceManager();
+    //   FileID MainFileID = SM.getMainFileID();
+    //   SourceLocation FileStart = SM.getLocForStartOfFile(MainFileID);
+    //   SmallVector<std::pair<IdentifierInfo *, SourceLocation>, 2> Path;
+    //   IdentifierInfo *ModuleID = PP.getIdentifierInfo(*ModuleName);
+    //   Path.push_back(std::make_pair(ModuleID, FileStart));
+    //   auto ModResult =
+    //       ScanInstance.loadModule(FileStart, Path, Module::Hidden, false);
+    //   PPCallbacks *CB = PP.getPPCallbacks();
+    //   CB->moduleImport(SourceLocation(), Path, ModResult);
+    //   CB->EndOfMainFile();
+    //   Result = true;
+    // } else {
+    //   Result = ScanInstance.ExecuteAction(*Action);
+    // }
 
     // ExecuteAction is responsible for calling finish.
     DiagConsumerFinished = true;
