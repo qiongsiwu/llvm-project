@@ -233,11 +233,12 @@ bool DependencyScanningWorkerFilesystem::shouldBypass(StringRef Path) const {
 
 DependencyScanningWorkerFilesystem::DependencyScanningWorkerFilesystem(
     DependencyScanningFilesystemSharedCache &SharedCache,
-    IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS)
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
+    DependencyScanningWorkerFSLogger *Logger)
     : llvm::RTTIExtends<DependencyScanningWorkerFilesystem,
                         llvm::vfs::ProxyFileSystem>(std::move(FS)),
       SharedCache(SharedCache),
-      WorkingDirForCacheLookup(llvm::errc::invalid_argument) {
+      WorkingDirForCacheLookup(llvm::errc::invalid_argument), Logger(Logger) {
   updateWorkingDirForCacheLookup();
 }
 
@@ -267,6 +268,9 @@ DependencyScanningWorkerFilesystem::computeAndStoreResult(
   llvm::ErrorOr<llvm::vfs::Status> Stat =
       getUnderlyingFS().status(OriginalFilename);
   if (!Stat) {
+    if (Logger) {
+      Logger->logNegativeStatCachedPath(FilenameForLookup);
+    }
     const auto &Entry =
         getOrEmplaceSharedEntryForFilename(FilenameForLookup, Stat.getError());
     return insertLocalEntryForFilename(FilenameForLookup, Entry);
@@ -482,6 +486,54 @@ DependencyScanningWorkerFilesystem::tryGetFilenameForLookup(
   }
   assert(llvm::sys::path::is_absolute_gnu(FilenameForLookup));
   return FilenameForLookup;
+}
+
+Expected<std::unique_ptr<DependencyScanningWorkerFSLogger>>
+DependencyScanningWorkerFSLogger::openIfEnabled() {
+  const char *V = getenv("LLVM_SCANNING_FS_LOG_PATH");
+
+  if (V) {
+    Twine Model = V + Twine("FSCache-%%%%%%%%.log");
+    std::error_code EC;
+    SmallString<128> FullPath;
+    llvm::sys::fs::createUniquePath(Model, FullPath,
+                                    /*MakeAbsolute=*/false);
+    auto OS = std::make_unique<llvm::raw_fd_ostream>(
+        FullPath, EC, llvm::sys::fs::CD_OpenAlways, llvm::sys::fs::FA_Write,
+        llvm::sys::fs::OF_Append);
+    if (EC) {
+      return createFileError(FullPath, EC);
+    }
+
+    OS->SetUnbuffered();
+
+    return std::unique_ptr<DependencyScanningWorkerFSLogger>(
+        new DependencyScanningWorkerFSLogger(std::move(OS)));
+  }
+  return nullptr;
+}
+
+void DependencyScanningWorkerFSLogger::logCommand(
+    const std::vector<std::string> &Commands) {
+  (*OS) << "Command: ";
+  for (const auto &C : Commands) {
+    (*OS) << C << " ";
+  }
+  (*OS) << "\n";
+}
+
+void DependencyScanningWorkerFSLogger::logNegativeStatCachedPath(
+    StringRef Path) {
+  (*OS) << "Negatively_caching: " << Path << "\n";
+}
+
+void DependencyScanningWorkerFSLogger::markScanFinished() {
+  (*OS) << "Scan_finished\n";
+}
+
+DependencyScanningWorkerFSLogger::~DependencyScanningWorkerFSLogger() {
+  OS->flush();
+  OS.reset(nullptr);
 }
 
 const char DependencyScanningWorkerFilesystem::ID = 0;

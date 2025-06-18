@@ -149,6 +149,8 @@ private:
   /// (passed in the constructor).
   llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS;
 
+  std::unique_ptr<DependencyScanningWorkerFSLogger> FSLogger;
+
   /// Private helper functions.
   bool scanDependencies(StringRef WorkingDirectory,
                         const std::vector<std::string> &CommandLine,

@@ -609,10 +609,17 @@ DependencyScanningWorker::DependencyScanningWorker(
   if (Service.shouldTraceVFS())
     FS = llvm::makeIntrusiveRefCnt<llvm::vfs::TracingFileSystem>(std::move(FS));
 
+  auto ExpectedLogger = DependencyScanningWorkerFSLogger::openIfEnabled();
+  if (auto E = ExpectedLogger.takeError()) {
+    // Don't do anything for now.
+  } else {
+    FSLogger = std::move(*ExpectedLogger);
+  }
+
   switch (Service.getMode()) {
   case ScanningMode::DependencyDirectivesScan:
-    DepFS =
-        new DependencyScanningWorkerFilesystem(Service.getSharedCache(), FS);
+    DepFS = new DependencyScanningWorkerFilesystem(Service.getSharedCache(), FS,
+                                                   FSLogger.get());
     BaseFS = DepFS;
     break;
   case ScanningMode::CanonicalPreprocessing:
@@ -733,6 +740,8 @@ bool DependencyScanningWorker::scanDependencies(
     DependencyConsumer &Consumer, DependencyActionController &Controller,
     DiagnosticConsumer &DC, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
     std::optional<StringRef> ModuleName) {
+  if (FSLogger)
+    FSLogger->logCommand(CommandLine);
   auto FileMgr =
       llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOptions{}, FS);
 
@@ -794,6 +803,9 @@ bool DependencyScanningWorker::scanDependencies(
   // Ensure finish() is called even if we never reached ExecuteAction().
   if (!Action.hasDiagConsumerFinished())
     DC.finish();
+
+  if (FSLogger)
+    FSLogger->markScanFinished();
 
   return Success && Action.hasScanned();
 }

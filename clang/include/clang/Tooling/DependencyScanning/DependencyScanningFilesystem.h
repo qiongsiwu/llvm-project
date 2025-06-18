@@ -332,6 +332,26 @@ public:
     return Entry.getDirectiveTokens();
   }
 };
+class DependencyScanningWorkerFSLogger {
+  std::unique_ptr<llvm::raw_fd_ostream> OS;
+
+public:
+  // Somehow generate a unique name.
+  static Expected<std::unique_ptr<DependencyScanningWorkerFSLogger>>
+  openIfEnabled();
+
+  ~DependencyScanningWorkerFSLogger();
+
+  void logCommand(const std::vector<std::string> &Commands);
+  void logNegativeStatCachedPath(StringRef Path);
+  void markScanFinished();
+
+  // TBD
+  // void logScanningPCM();
+private:
+  DependencyScanningWorkerFSLogger(std::unique_ptr<llvm::raw_fd_ostream> OS)
+      : OS(std::move(OS)) {}
+};
 
 /// A virtual file system optimized for the dependency discovery.
 ///
@@ -350,7 +370,8 @@ public:
 
   DependencyScanningWorkerFilesystem(
       DependencyScanningFilesystemSharedCache &SharedCache,
-      IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS);
+      IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
+      DependencyScanningWorkerFSLogger *Logger = nullptr);
 
   llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path) override;
   llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
@@ -490,6 +511,8 @@ private:
   /// The working directory to use for making relative paths absolute before
   /// using them for cache lookups.
   llvm::ErrorOr<std::string> WorkingDirForCacheLookup;
+
+  DependencyScanningWorkerFSLogger *Logger = nullptr;
 
   void updateWorkingDirForCacheLookup();
 
