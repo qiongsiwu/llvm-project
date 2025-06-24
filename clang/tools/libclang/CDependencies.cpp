@@ -566,43 +566,6 @@ CXDiagnosticSet clang_experimental_DepGraph_getDiagnostics(CXDepGraph Graph) {
   return unwrap(Graph)->getDiagnosticSet();
 }
 
-CXCStringArray
-clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
-    CXDependencyScannerService S) {
-  DependencyScanningService &Service = unwrap(S)->Service;
-  CStringsManager &StrMgr = unwrap(S)->StrMgr;
-
-  // FIXME: CAS currently does not use the shared cache, and cannot produce
-  // the same diagnostics. We should add such a diagnostics to CAS as well.
-  if (Service.useCASFS())
-    return {nullptr, 0};
-
-  DependencyScanningFilesystemSharedCache &SharedCache =
-      Service.getSharedCache();
-
-  // Note that it is critical that this FS is the same as the default virtual
-  // file system we pass to the DependencyScanningWorkers.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
-      llvm::vfs::createPhysicalFileSystem();
-
-  auto OutOfDateEntries = SharedCache.getOutOfDateEntries(*FS);
-
-  // FIXME: this is just fixing the build error for now.
-  std::vector<std::string> OutOfDatePaths(OutOfDateEntries.size());
-  for (size_t i = 0; i < OutOfDateEntries.size(); i++) {
-    OutOfDateEntries.emplace_back(OutOfDateEntries[i].Path);
-  }
-
-  // FIXME: This code here creates copies of strings from
-  // InvaidNegStatCachedPaths. It is acceptable because this C-API is expected
-  // to be called only at the end of a CXDependencyScannerService's lifetime.
-  // In other words, it is called very infrequently. We can change
-  // CStringsManager's interface to accommodate handling arbitrary StringRefs
-  // (which may not be null terminated) if we want to avoid copying.
-  return StrMgr.createCStringsOwned(
-      {OutOfDatePaths.begin(), OutOfDatePaths.end()});
-}
-
 static std::string
 lookupModuleOutput(const ModuleDeps &MD, ModuleOutputKind MOK, void *MLOContext,
                    std::variant<CXModuleLookupOutputCallback *,
@@ -644,6 +607,100 @@ std::string OutputLookup::lookupModuleOutput(const ModuleDeps &MD,
   if (PCMPath.second)
     PCMPath.first->second = ::lookupModuleOutput(MD, MOK, MLOContext, MLO);
   return PCMPath.first->second;
+}
+
+namespace {
+typedef std::vector<DependencyScanningFilesystemSharedCache::OutOfDateEntry>
+    DependencyScannerFSOutOfDateEntrySet;
+
+typedef DependencyScanningFilesystemSharedCache::OutOfDateEntry
+    DependencyScannerFSOutOfDateEntry;
+} // namespace
+
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerFSOutOfDateEntrySet,
+                                   CXDepScanFSOutOfDateEntrySet)
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerFSOutOfDateEntry,
+                                   CXDepScanFSOutOfDateEntry)
+
+CXDepScanFSOutOfDateEntrySet
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
+    CXDependencyScannerService S) {
+  DependencyScanningService &Service = unwrap(S)->Service;
+
+  if (Service.useCASFS())
+    return nullptr;
+
+  // Note that it is critical that this FS is the same as the default virtual
+  // file system we pass to the DependencyScanningWorkers.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
+      llvm::vfs::createPhysicalFileSystem();
+
+  DependencyScannerFSOutOfDateEntrySet *OODEntrySet =
+      new DependencyScannerFSOutOfDateEntrySet();
+  *OODEntrySet = Service.getSharedCache().getOutOfDateEntries(*FS);
+
+  return wrap(OODEntrySet);
+}
+
+size_t
+clang_experimental_DependencyScannerService_getNumOfFSCacheOutOfDateEntries(
+    CXDepScanFSOutOfDateEntrySet Entries) {
+  return unwrap(Entries)->size();
+}
+
+CXDepScanFSOutOfDateEntry
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntry(
+    CXDepScanFSOutOfDateEntrySet Entries, size_t Idx) {
+  DependencyScannerFSOutOfDateEntrySet *EntSet = unwrap(Entries);
+  return wrap(&(*EntSet)[Idx]);
+}
+
+CXDepScanFSCacheOutOfDateKind
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryKind(
+    CXDepScanFSOutOfDateEntry Entry) {
+  DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
+  auto &Info = E->Info;
+  return std::visit(
+      llvm::makeVisitor(
+          [](const DependencyScannerFSOutOfDateEntry::NegativelyCachedInfo
+                 &Info) { return NegativelyCached; },
+          [](const DependencyScannerFSOutOfDateEntry::SizeChangedInfo &Info) {
+            return SizeChanged;
+          }),
+      Info);
+}
+
+CXString
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryPath(
+    CXDepScanFSOutOfDateEntry Entry) {
+  return cxstring::createRef(unwrap(Entry)->Path);
+}
+
+static DependencyScannerFSOutOfDateEntry::SizeChangedInfo *
+getOutOfDateEntrySizeChangedInfo(DependencyScannerFSOutOfDateEntry *E) {
+  auto *SizeInfo =
+      std::get_if<DependencyScannerFSOutOfDateEntry::SizeChangedInfo>(&E->Info);
+  assert(SizeInfo && "Wrong entry kind to get the original size!");
+  return SizeInfo;
+}
+
+uint64_t
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryCachedSize(
+    CXDepScanFSOutOfDateEntry Entry) {
+  DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
+  return getOutOfDateEntrySizeChangedInfo(E)->CachedSize;
+}
+
+uint64_t
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryActualSize(
+    CXDepScanFSOutOfDateEntry Entry) {
+  DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
+  return getOutOfDateEntrySizeChangedInfo(E)->ActualSize;
+}
+
+void clang_experimental_DependencyScannerService_disposeFSCacheOutOfDateEntrySet(
+    CXDepScanFSOutOfDateEntrySet Entries) {
+  delete unwrap(Entries);
 }
 
 namespace {

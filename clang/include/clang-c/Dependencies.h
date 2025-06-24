@@ -585,10 +585,41 @@ const char *clang_experimental_DepGraph_getTUContextHash(CXDepGraph);
 CINDEX_LINKAGE
 CXDiagnosticSet clang_experimental_DepGraph_getDiagnostics(CXDepGraph);
 
-CINDEX_LINKAGE
-CXCStringArray
-    clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
-        CXDependencyScannerService);
+typedef enum { NegativelyCached, SizeChanged } CXDepScanFSCacheOutOfDateKind;
+
+typedef struct CXOpaqueDepScanFSOutOfDateEntrySet *CXDepScanFSOutOfDateEntrySet;
+typedef struct CXOpaqueDepScanFSOutOfDateEntry *CXDepScanFSOutOfDateEntry;
+
+CXDepScanFSOutOfDateEntrySet
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
+    CXDependencyScannerService S);
+
+size_t
+clang_experimental_DependencyScannerService_getNumOfFSCacheOutOfDateEntries(
+    CXDepScanFSOutOfDateEntrySet Entries);
+
+CXDepScanFSOutOfDateEntry
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntry(
+    CXDepScanFSOutOfDateEntrySet Entries, size_t Idx);
+
+CXDepScanFSCacheOutOfDateKind
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryKind(
+    CXDepScanFSOutOfDateEntry Entry);
+
+CXString
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryPath(
+    CXDepScanFSOutOfDateEntry Entry);
+
+uint64_t
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryCachedSize(
+    CXDepScanFSOutOfDateEntry Entry);
+
+uint64_t
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryActualSize(
+    CXDepScanFSOutOfDateEntry Entry);
+
+void clang_experimental_DependencyScannerService_disposeFSCacheOutOfDateEntrySet(
+    CXDepScanFSOutOfDateEntrySet Entries);
 
 /**
  * Options used to generate a reproducer.

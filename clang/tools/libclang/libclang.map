@@ -577,10 +577,17 @@ LLVM_21 {
     clang_experimental_DepGraphModule_isCWDIgnored;
     clang_experimental_DepGraphModule_isInStableDirs; 
     clang_getFullyQualifiedName;
-    clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths;
     clang_experimental_DependencyScannerReproducerOptions_create;
     clang_experimental_DependencyScannerReproducerOptions_dispose;
     clang_experimental_DependencyScanner_generateReproducer;
+    clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet;
+    clang_experimental_DependencyScannerService_getNumOfFSCacheOutOfDateEntries;
+    clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntry;
+    clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryKind;
+    clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryPath;
+    clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryCachedSize;
+    clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryActualSize;
+    clang_experimental_DependencyScannerService_disposeFSCacheOutOfDateEntrySet;
 };
 
 # Example of how to add a new symbol version entry.  If you do add a new symbol
