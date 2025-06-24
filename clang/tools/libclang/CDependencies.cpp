@@ -585,8 +585,13 @@ clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
       llvm::vfs::createPhysicalFileSystem();
 
-  auto InvaidNegStatCachedPaths =
-      SharedCache.getInvalidNegativeStatCachedPaths(*FS);
+  auto OutOfDateEntries = SharedCache.getOutOfDateEntries(*FS);
+
+  // FIXME: this is just fixing the build error for now.
+  std::vector<std::string> OutOfDatePaths(OutOfDateEntries.size());
+  for (size_t i = 0; i < OutOfDateEntries.size(); i++) {
+    OutOfDateEntries.emplace_back(OutOfDateEntries[i].Path);
+  }
 
   // FIXME: This code here creates copies of strings from
   // InvaidNegStatCachedPaths. It is acceptable because this C-API is expected
@@ -595,7 +600,7 @@ clang_experimental_DependencyScannerService_getInvalidNegStatCachedPaths(
   // CStringsManager's interface to accommodate handling arbitrary StringRefs
   // (which may not be null terminated) if we want to avoid copying.
   return StrMgr.createCStringsOwned(
-      {InvaidNegStatCachedPaths.begin(), InvaidNegStatCachedPaths.end()});
+      {OutOfDatePaths.begin(), OutOfDatePaths.end()});
 }
 
 static std::string

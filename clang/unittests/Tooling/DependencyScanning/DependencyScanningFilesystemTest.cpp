@@ -7,10 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Tooling/DependencyScanning/DependencyScanningFilesystem.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/CAS/CASOptions.h"
-#include "llvm/CAS/CachingOnDiskFileSystem.h"
+#include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "gtest/gtest.h"
 
@@ -211,9 +211,44 @@ TEST(DependencyScanningFilesystem, DiagnoseStaleStatFailures) {
   // DepFS's eyes.
   EXPECT_EQ(Path1Exists, false);
 
-  std::vector<llvm::StringRef> InvalidPaths =
-      Service.getSharedCache().getInvalidNegativeStatCachedPaths(*InMemoryFS);
+  auto InvalidEntries =
+      Service.getSharedCache().getOutOfDateEntries(*InMemoryFS);
 
-  EXPECT_EQ(InvalidPaths.size(), 1u);
-  ASSERT_STREQ("/path1.suffix", InvalidPaths[0].str().c_str());
+  EXPECT_EQ(InvalidEntries.size(), 1u);
+  ASSERT_STREQ("/path1.suffix", InvalidEntries[0].Path);
+}
+
+TEST(DependencyScanningFilesystem, DiagnoseCachedFileSizeChange) {
+  auto InMemoryFS1 = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  auto InMemoryFS2 = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  InMemoryFS1->setCurrentWorkingDirectory("/");
+  InMemoryFS2->setCurrentWorkingDirectory("/");
+
+  DependencyScanningService Service(ScanningMode::DependencyDirectivesScan,
+                                    ScanningOutputFormat::Make, {}, nullptr,
+                                    nullptr, nullptr);
+  DependencyScanningWorkerFilesystem DepFS(Service, InMemoryFS1);
+
+  InMemoryFS1->addFile("/path1.suffix", 0,
+                       llvm::MemoryBuffer::getMemBuffer(""));
+  bool Path1Exists = DepFS.exists("/path1.suffix");
+  ASSERT_EQ(Path1Exists, true);
+
+  // Add a file to a new FS that has the same path but different content.
+  InMemoryFS2->addFile("/path1.suffix", 1,
+                       llvm::MemoryBuffer::getMemBuffer("        "));
+
+  // Check against the new file system. InMemoryFS2 could be the underlying
+  // physical system in the real world.
+  auto InvalidEntries =
+      Service.getSharedCache().getOutOfDateEntries(*InMemoryFS2);
+
+  ASSERT_EQ(InvalidEntries.size(), 1u);
+  ASSERT_STREQ("/path1.suffix", InvalidEntries[0].Path);
+  auto *SizeInfo = std::get_if<
+      DependencyScanningFilesystemSharedCache::OutOfDateEntry::SizeChangedInfo>(
+      &InvalidEntries[0].Info);
+  ASSERT_TRUE(SizeInfo);
+  ASSERT_EQ(SizeInfo->CachedSize, 0u);
+  ASSERT_EQ(SizeInfo->ActualSize, 8u);
 }
