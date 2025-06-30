@@ -627,15 +627,14 @@ typedef struct CXOpaqueDepScanFSOutOfDateEntry *CXDepScanFSOutOfDateEntry;
  * out-of-date entries are used and disposed.
  */
 CXDepScanFSOutOfDateEntrySet
-clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
+clang_experimental_DepScanFSCacheOutOfEntrySet_getSet(
     CXDependencyScannerService S);
 
 /**
  * Returns the number of out-of-date entries contained in a
  * \c CXDepScanFSOutOfDateEntrySet .
  */
-size_t
-clang_experimental_DependencyScannerService_getNumOfFSCacheOutOfDateEntries(
+size_t clang_experimental_DepScanFSCacheOutOfEntrySet_getNumOfEntries(
     CXDepScanFSOutOfDateEntrySet Entries);
 
 /**
@@ -643,43 +642,40 @@ clang_experimental_DependencyScannerService_getNumOfFSCacheOutOfDateEntries(
  * CXDepScanFSOutOfDateEntrySet instance.
  */
 CXDepScanFSOutOfDateEntry
-clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntry(
+clang_experimental_DepScanFSCacheOutOfEntrySet_getEntry(
     CXDepScanFSOutOfDateEntrySet Entries, size_t Idx);
 
 /**
  * Given an instance of \c CXDepScanFSOutOfDateEntry, returns its Kind.
  */
 CXDepScanFSCacheOutOfDateKind
-clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryKind(
+clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryKind(
     CXDepScanFSOutOfDateEntry Entry);
 
 /**
  * Given an instance of \c CXDepScanFSOutOfDateEntry, returns the path.
  */
-CXString
-clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryPath(
+CXString clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryPath(
     CXDepScanFSOutOfDateEntry Entry);
 
 /**
  * Given an instance of \c CXDepScanFSOutOfDateEntry of kind SizeChanged,
  * returns the cached size.
  */
-uint64_t
-clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryCachedSize(
+uint64_t clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryCachedSize(
     CXDepScanFSOutOfDateEntry Entry);
 
 /**
  * Given an instance of \c CXDepScanFSOutOfDateEntry of kind SizeChanged,
  * returns the actual size on the underlying file system.
  */
-uint64_t
-clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntryActualSize(
+uint64_t clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryActualSize(
     CXDepScanFSOutOfDateEntry Entry);
 
 /**
  * Dispose the \c CXDepScanFSOutOfDateEntrySet instance.
  */
-void clang_experimental_DependencyScannerService_disposeFSCacheOutOfDateEntrySet(
+void clang_experimental_DepScanFSCacheOutOfEntrySet_disposeSet(
     CXDepScanFSOutOfDateEntrySet Entries);
 
 /**
