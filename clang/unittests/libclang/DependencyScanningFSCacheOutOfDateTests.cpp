@@ -57,7 +57,7 @@ TEST(DependencyScanningFSCacheOutOfDate, Basic) {
 
   for (size_t Idx = 0; Idx < NumEntries; Idx++) {
     CXDepScanFSOutOfDateEntry Entry =
-        clang_experimental_DepScanFSCacheOutOfEntrySet_getEntry(Entries, 0);
+        clang_experimental_DepScanFSCacheOutOfEntrySet_getEntry(Entries, Idx);
     CXDepScanFSCacheOutOfDateKind Kind =
         clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryKind(Entry);
     CXString Path =
