@@ -81,17 +81,11 @@ struct CStringsManager {
     return createCStringsRef(*OwnedStdStr.back());
   }
 };
-
-struct DependencyScannerService {
-  DependencyScanningService Service;
-  CStringsManager StrMgr{};
-};
 } // end anonymous namespace
 
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerServiceOptions,
                                    CXDependencyScannerServiceOptions)
-
-DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerService,
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningService,
                                    CXDependencyScannerService)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningWorker,
                                    CXDependencyScannerWorker)
@@ -172,9 +166,9 @@ clang_experimental_DependencyScannerService_create_v0(CXDependencyMode Format) {
   // FIXME: Pass default CASOpts and nullptr as CachingOnDiskFileSystem now.
   CASOptions CASOpts;
   IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> FS;
-  return wrap(new DependencyScannerService{DependencyScanningService(
+  return wrap(new DependencyScanningService(
       ScanningMode::DependencyDirectivesScan, unwrap(Format), CASOpts,
-      /*CAS=*/nullptr, /*ActionCache=*/nullptr, FS)});
+      /*CAS=*/nullptr, /*ActionCache=*/nullptr, FS));
 }
 
 ScanningOutputFormat DependencyScannerServiceOptions::getFormat() const {
@@ -210,10 +204,10 @@ clang_experimental_DependencyScannerService_create_v1(
     FS = llvm::cantFail(
         llvm::cas::createCachingOnDiskFileSystem(CAS));
   }
-  return wrap(new DependencyScannerService{DependencyScanningService(
+  return wrap(new DependencyScanningService(
       ScanningMode::DependencyDirectivesScan, Format, unwrap(Opts)->CASOpts,
       std::move(CAS), std::move(Cache), std::move(FS),
-      unwrap(Opts)->OptimizeArgs)});
+      unwrap(Opts)->OptimizeArgs));
 }
 
 void clang_experimental_DependencyScannerService_dispose_v0(
@@ -223,16 +217,16 @@ void clang_experimental_DependencyScannerService_dispose_v0(
 
 CXDependencyScannerWorker clang_experimental_DependencyScannerWorker_create_v0(
     CXDependencyScannerService S) {
-  ScanningOutputFormat Format = unwrap(S)->Service.getFormat();
+  ScanningOutputFormat Format = unwrap(S)->getFormat();
   bool IsIncludeTreeOutput = Format == ScanningOutputFormat::IncludeTree ||
                              Format == ScanningOutputFormat::FullIncludeTree;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
       llvm::vfs::createPhysicalFileSystem();
   if (IsIncludeTreeOutput)
-    FS = llvm::cas::createCASProvidingFileSystem(unwrap(S)->Service.getCAS(),
+    FS = llvm::cas::createCASProvidingFileSystem(unwrap(S)->getCAS(),
                                                  std::move(FS));
 
-  return wrap(new DependencyScanningWorker(unwrap(S)->Service, FS));
+  return wrap(new DependencyScanningWorker(*unwrap(S), FS));
 }
 
 void clang_experimental_DependencyScannerWorker_dispose_v0(
@@ -625,7 +619,7 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerFSOutOfDateEntry,
 CXDepScanFSOutOfDateEntrySet
 clang_experimental_DepScanFSCacheOutOfEntrySet_getSet(
     CXDependencyScannerService S) {
-  DependencyScanningService &Service = unwrap(S)->Service;
+  DependencyScanningService &Service = *unwrap(S);
 
   if (Service.useCASFS())
     return nullptr;
@@ -678,7 +672,7 @@ static DependencyScannerFSOutOfDateEntry::SizeChangedInfo *
 getOutOfDateEntrySizeChangedInfo(DependencyScannerFSOutOfDateEntry *E) {
   auto *SizeInfo =
       std::get_if<DependencyScannerFSOutOfDateEntry::SizeChangedInfo>(&E->Info);
-  assert(SizeInfo && "Wrong entry kind to get the original size!");
+  assert(SizeInfo && "Wrong entry kind to get size changed info!");
   return SizeInfo;
 }
 

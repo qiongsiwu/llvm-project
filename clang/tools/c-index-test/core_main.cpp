@@ -916,9 +916,6 @@ static int scanDeps(ArrayRef<const char *> Args, std::string WorkingDirectory,
     clang_disposeDiagnostic(Diag);
   }
 
-  llvm::errs() << "note: number of invalid negatively stat cached paths: " << 0
-               << "\n";
-
   return 1;
 }
 
