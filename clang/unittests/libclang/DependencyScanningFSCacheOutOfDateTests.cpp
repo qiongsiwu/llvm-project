@@ -48,20 +48,22 @@ TEST(DependencyScanningFSCacheOutOfDate, Basic) {
   ASSERT_TRUE(PathExists);
 
   CXDepScanFSOutOfDateEntrySet Entries =
-      clang_experimental_DepScanFSCacheOutOfEntrySet_getSet(
+      clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
           reinterpret_cast<CXDependencyScannerService>(&Service));
 
   size_t NumEntries =
-      clang_experimental_DepScanFSCacheOutOfEntrySet_getNumOfEntries(Entries);
+      clang_experimental_DepScanFSCacheOutOfDateEntrySet_getNumOfEntries(
+          Entries);
   EXPECT_EQ(NumEntries, 2u);
 
   for (size_t Idx = 0; Idx < NumEntries; Idx++) {
     CXDepScanFSOutOfDateEntry Entry =
-        clang_experimental_DepScanFSCacheOutOfEntrySet_getEntry(Entries, Idx);
+        clang_experimental_DepScanFSCacheOutOfDateEntrySet_getEntry(Entries,
+                                                                    Idx);
     CXDepScanFSCacheOutOfDateKind Kind =
-        clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryKind(Entry);
+        clang_experimental_DepScanFSCacheOutOfDateEntry_getKind(Entry);
     CXString Path =
-        clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryPath(Entry);
+        clang_experimental_DepScanFSCacheOutOfDateEntry_getPath(Entry);
     ASSERT_TRUE(Kind == NegativelyCached || Kind == SizeChanged);
     switch (Kind) {
     case NegativelyCached:
@@ -70,16 +72,14 @@ TEST(DependencyScanningFSCacheOutOfDate, Basic) {
     case SizeChanged:
       ASSERT_STREQ(clang_getCString(Path), File2Path.c_str());
       ASSERT_EQ(
-          clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryCachedSize(
-              Entry),
+          clang_experimental_DepScanFSCacheOutOfDateEntry_getCachedSize(Entry),
           8u);
       ASSERT_EQ(
-          clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryActualSize(
-              Entry),
+          clang_experimental_DepScanFSCacheOutOfDateEntry_getActualSize(Entry),
           0u);
       break;
     }
   }
 
-  clang_experimental_DepScanFSCacheOutOfEntrySet_disposeSet(Entries);
+  clang_experimental_DepScanFSCacheOutOfDateEntrySet_disposeSet(Entries);
 }

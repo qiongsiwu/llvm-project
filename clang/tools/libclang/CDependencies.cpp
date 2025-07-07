@@ -617,10 +617,12 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerFSOutOfDateEntry,
                                    CXDepScanFSOutOfDateEntry)
 
 CXDepScanFSOutOfDateEntrySet
-clang_experimental_DepScanFSCacheOutOfEntrySet_getSet(
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
     CXDependencyScannerService S) {
   DependencyScanningService &Service = *unwrap(S);
 
+  // FIXME: CAS FS currently does not use the shared cache, and cannot produce
+  // the same diagnostics. We should add such a diagnostics to CAS as well.
   if (Service.useCASFS())
     return nullptr;
 
@@ -636,20 +638,20 @@ clang_experimental_DepScanFSCacheOutOfEntrySet_getSet(
   return wrap(OODEntrySet);
 }
 
-size_t clang_experimental_DepScanFSCacheOutOfEntrySet_getNumOfEntries(
+size_t clang_experimental_DepScanFSCacheOutOfDateEntrySet_getNumOfEntries(
     CXDepScanFSOutOfDateEntrySet Entries) {
   return unwrap(Entries)->size();
 }
 
 CXDepScanFSOutOfDateEntry
-clang_experimental_DepScanFSCacheOutOfEntrySet_getEntry(
+clang_experimental_DepScanFSCacheOutOfDateEntrySet_getEntry(
     CXDepScanFSOutOfDateEntrySet Entries, size_t Idx) {
   DependencyScannerFSOutOfDateEntrySet *EntSet = unwrap(Entries);
   return wrap(&(*EntSet)[Idx]);
 }
 
 CXDepScanFSCacheOutOfDateKind
-clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryKind(
+clang_experimental_DepScanFSCacheOutOfDateEntry_getKind(
     CXDepScanFSOutOfDateEntry Entry) {
   DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
   auto &Info = E->Info;
@@ -663,7 +665,7 @@ clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryKind(
       Info);
 }
 
-CXString clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryPath(
+CXString clang_experimental_DepScanFSCacheOutOfDateEntry_getPath(
     CXDepScanFSOutOfDateEntry Entry) {
   return cxstring::createRef(unwrap(Entry)->Path);
 }
@@ -676,19 +678,19 @@ getOutOfDateEntrySizeChangedInfo(DependencyScannerFSOutOfDateEntry *E) {
   return SizeInfo;
 }
 
-uint64_t clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryCachedSize(
+uint64_t clang_experimental_DepScanFSCacheOutOfDateEntry_getCachedSize(
     CXDepScanFSOutOfDateEntry Entry) {
   DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
   return getOutOfDateEntrySizeChangedInfo(E)->CachedSize;
 }
 
-uint64_t clang_experimental_DepScanFSCacheOutOfEntrySet_getEntryActualSize(
+uint64_t clang_experimental_DepScanFSCacheOutOfDateEntry_getActualSize(
     CXDepScanFSOutOfDateEntry Entry) {
   DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
   return getOutOfDateEntrySizeChangedInfo(E)->ActualSize;
 }
 
-void clang_experimental_DepScanFSCacheOutOfEntrySet_disposeSet(
+void clang_experimental_DepScanFSCacheOutOfDateEntrySet_disposeSet(
     CXDepScanFSOutOfDateEntrySet Entries) {
   delete unwrap(Entries);
 }
