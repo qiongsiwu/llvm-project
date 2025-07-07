@@ -1,4 +1,4 @@
-//===- unittests/libclang/DependencyScanningFSCacheOutOfDateTests.cpp ---- ===//
+//===- unittests/libclang/DependencyScanningCAPITests.cpp ---------------- ===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -14,7 +14,7 @@ using namespace clang;
 using namespace tooling;
 using namespace dependencies;
 
-TEST(DependencyScanningFSCacheOutOfDate, Basic) {
+TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
   DependencyScanningService Service(ScanningMode::DependencyDirectivesScan,
                                     ScanningOutputFormat::Full, CASOptions(),
                                     nullptr, nullptr, nullptr);
