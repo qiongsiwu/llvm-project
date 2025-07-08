@@ -131,7 +131,11 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
           // later. The cache entry is not invalidated (as we have no good
           // way to do it now), which may lead to missing file build errors.
           InvalidDiagInfo.emplace_back(Path.data());
-        } else {
+        } else if (Status->getType() ==
+                   llvm::sys::fs::file_type::regular_file) {
+          // We only check regular files. Directory files sizes could change due
+          // to content changes, and reporting directory size changes can lead
+          // to false positives.
           llvm::vfs::Status CachedStatus = Entry->getStatus();
           uint64_t CachedSize = CachedStatus.getSize();
           uint64_t ActualSize = Status->getSize();

@@ -29,7 +29,7 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
       clang_experimental_DependencyScannerWorker_create_v0(Service);
 
   // Set up the directory structure before scanning.
-  // - `/tmp/include/`
+  // - `/tmp/include/a.h`
   // - `/tmp/include2/b.h`
   llvm::SmallString<128> Dir;
   ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("tmp", Dir));
@@ -41,6 +41,14 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
   llvm::SmallString<128> Include2 = Dir;
   llvm::sys::path::append(Include2, "include2");
   ASSERT_FALSE(llvm::sys::fs::create_directories(Include2));
+
+  llvm::SmallString<128> HeaderA = Include;
+  llvm::sys::path::append(HeaderA, "a.h");
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream HeaderAFile(HeaderA, EC);
+    ASSERT_FALSE(EC);
+  }
 
   // Initially, we keep include/b.h missing and only create include2/b.h.
   llvm::SmallString<128> HeaderB2 = Include2;
@@ -58,6 +66,7 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
     llvm::raw_fd_ostream TUFile(TU, EC);
     ASSERT_FALSE(EC);
     TUFile << R"(
+      #include "a.h"
       #include "b.h"
     ")";
   }
@@ -76,9 +85,15 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
           Worker, ScanSettings, Graph);
   ASSERT_EQ(ScanResult, CXError_Success);
 
-  // Now, we populate include/b.h. We have
-  // - `/tmp/include/b.h`
-  // - `/tmp/include2/b.h`
+  // Change the size of include/a.h.
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream HeaderAFile(HeaderA, EC);
+    ASSERT_FALSE(EC);
+    HeaderAFile << "// New content!\n";
+  }
+
+  // Populate include/b.h.
   llvm::SmallString<128> HeaderB = Include;
   llvm::sys::path::append(HeaderB, "b.h");
   {
@@ -86,6 +101,12 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
     llvm::raw_fd_ostream HeaderBFile(HeaderB, EC);
     ASSERT_FALSE(EC);
   }
+
+  // Directory structure after the change.
+  // - `/tmp/include/`
+  //     - `a.h` ==> size has changed.
+  //     - `b.h`
+  // - `/tmp/include2/b.h`
 
   CXDepScanFSOutOfDateEntrySet Entries =
       clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
@@ -96,6 +117,8 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
           Entries);
   EXPECT_EQ(NumEntries, 2u);
 
+  bool CheckedNegativelyCached = false;
+  bool CheckedSizeChanged = false;
   for (size_t Idx = 0; Idx < NumEntries; Idx++) {
     CXDepScanFSOutOfDateEntry Entry =
         clang_experimental_DepScanFSCacheOutOfDateEntrySet_getEntry(Entries,
@@ -108,18 +131,22 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
     switch (Kind) {
     case NegativelyCached:
       EXPECT_STREQ(clang_getCString(Path), HeaderB.c_str());
+      CheckedNegativelyCached = true;
       break;
     case SizeChanged:
-      EXPECT_STREQ(clang_getCString(Path), Include.c_str());
+      EXPECT_STREQ(clang_getCString(Path), HeaderA.c_str());
       EXPECT_EQ(
           clang_experimental_DepScanFSCacheOutOfDateEntry_getCachedSize(Entry),
-          64u);
+          0u);
       EXPECT_EQ(
           clang_experimental_DepScanFSCacheOutOfDateEntry_getActualSize(Entry),
-          96u);
+          16u);
+      CheckedSizeChanged = true;
       break;
     }
   }
+
+  EXPECT_TRUE(CheckedNegativelyCached && CheckedSizeChanged);
 
   clang_experimental_DepScanFSCacheOutOfDateEntrySet_disposeSet(Entries);
 }
