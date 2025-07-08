@@ -15,41 +15,81 @@ using namespace tooling;
 using namespace dependencies;
 
 TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
-  DependencyScanningService Service(ScanningMode::DependencyDirectivesScan,
-                                    ScanningOutputFormat::Full, CASOptions(),
-                                    nullptr, nullptr, nullptr);
+  // This test is setup to have two out-of-date file system cache entries,
+  // one is negatively stat cached, the other has its size changed.
+  //  - `include/b.h` is negatively stat cached.
+  //  - `include` (the directory) has its size changed, because `b.h` is added
+  //     to it.
 
-  auto &SharedCache = Service.getSharedCache();
+  CXDependencyScannerServiceOptions ServiceOptions =
+      clang_experimental_DependencyScannerServiceOptions_create();
+  CXDependencyScannerService Service =
+      clang_experimental_DependencyScannerService_create_v1(ServiceOptions);
+  CXDependencyScannerWorker Worker =
+      clang_experimental_DependencyScannerWorker_create_v0(Service);
 
-  auto InMemoryFS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
-  DependencyScanningWorkerFilesystem DepFS(SharedCache, InMemoryFS);
+  // Set up the directory structure before scanning.
+  // - `/tmp/include/`
+  // - `/tmp/include2/b.h`
+  llvm::SmallString<128> Dir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("tmp", Dir));
 
-  // file1 is negatively stat cached.
-  // file2 has different sizes in the cache and on the physical file system.
-  // The test creates file1 and file2 on the physical file system.
-  // Service's cache is setup to use an in-memory file system so we
-  // can leave out file1 and have a file2 with size 8 (instead of 0).
-  int fd;
-  llvm::SmallString<128> File1Path;
-  llvm::SmallString<128> File2Path;
-  auto EC = llvm::sys::fs::createTemporaryFile("file1", "h", fd, File1Path);
-  ASSERT_FALSE(EC);
-  EC = llvm::sys::fs::createTemporaryFile("file2", "h", fd, File2Path);
-  ASSERT_FALSE(EC);
+  llvm::SmallString<128> Include = Dir;
+  llvm::sys::path::append(Include, "include");
+  ASSERT_FALSE(llvm::sys::fs::create_directories(Include));
 
-  // Trigger negative stat caching on DepFS.
-  bool PathExists = DepFS.exists(File1Path);
-  ASSERT_FALSE(PathExists);
+  llvm::SmallString<128> Include2 = Dir;
+  llvm::sys::path::append(Include2, "include2");
+  ASSERT_FALSE(llvm::sys::fs::create_directories(Include2));
 
-  // Add file2 to the in memory FS with non-zero size.
-  InMemoryFS->addFile(File2Path, 1,
-                      llvm::MemoryBuffer::getMemBuffer("        "));
-  PathExists = DepFS.exists(File2Path);
-  ASSERT_TRUE(PathExists);
+  // Initially, we keep include/b.h missing and only create include2/b.h.
+  llvm::SmallString<128> HeaderB2 = Include2;
+  llvm::sys::path::append(HeaderB2, "b.h");
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream HeaderB2File(HeaderB2, EC);
+    ASSERT_FALSE(EC);
+  }
+
+  llvm::SmallString<128> TU = Dir;
+  llvm::sys::path::append(TU, "tu.c");
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream TUFile(TU, EC);
+    ASSERT_FALSE(EC);
+    TUFile << R"(
+      #include "b.h"
+    ")";
+  }
+
+  const char *Argv[] = {"-c", TU.c_str(),      "-I", Include.c_str(),
+                        "-I", Include2.c_str()};
+  size_t Argc = std::size(Argv);
+  CXDependencyScannerWorkerScanSettings ScanSettings =
+      clang_experimental_DependencyScannerWorkerScanSettings_create(
+          Argc, Argv, /*ModuleName=*/nullptr, /*WorkingDirectory=*/Dir.c_str(),
+          /*MLOContext=*/nullptr, /*MLO=*/nullptr);
+
+  CXDepGraph *Graph = new CXDepGraph;
+  CXErrorCode ScanResult =
+      clang_experimental_DependencyScannerWorker_getDepGraph(
+          Worker, ScanSettings, Graph);
+  ASSERT_EQ(ScanResult, CXError_Success);
+
+  // Now, we populate include/b.h. We have
+  // - `/tmp/include/b.h`
+  // - `/tmp/include2/b.h`
+  llvm::SmallString<128> HeaderB = Include;
+  llvm::sys::path::append(HeaderB, "b.h");
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream HeaderBFile(HeaderB, EC);
+    ASSERT_FALSE(EC);
+  }
 
   CXDepScanFSOutOfDateEntrySet Entries =
       clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
-          reinterpret_cast<CXDependencyScannerService>(&Service));
+          Service);
 
   size_t NumEntries =
       clang_experimental_DepScanFSCacheOutOfDateEntrySet_getNumOfEntries(
@@ -67,16 +107,16 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
     ASSERT_TRUE(Kind == NegativelyCached || Kind == SizeChanged);
     switch (Kind) {
     case NegativelyCached:
-      ASSERT_STREQ(clang_getCString(Path), File1Path.c_str());
+      EXPECT_STREQ(clang_getCString(Path), HeaderB.c_str());
       break;
     case SizeChanged:
-      ASSERT_STREQ(clang_getCString(Path), File2Path.c_str());
-      ASSERT_EQ(
+      EXPECT_STREQ(clang_getCString(Path), Include.c_str());
+      EXPECT_EQ(
           clang_experimental_DepScanFSCacheOutOfDateEntry_getCachedSize(Entry),
-          8u);
-      ASSERT_EQ(
+          64u);
+      EXPECT_EQ(
           clang_experimental_DepScanFSCacheOutOfDateEntry_getActualSize(Entry),
-          0u);
+          96u);
       break;
     }
   }
