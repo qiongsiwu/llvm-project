@@ -41,6 +41,7 @@
 #include "clang/Serialization/GlobalModuleIndex.h"
 #include "clang/Serialization/InMemoryModuleCache.h"
 #include "clang/Serialization/ModuleCache.h"
+#include "clang/Tooling/DependencyScanning/DependencyScanningFilesystem.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -833,8 +834,14 @@ CompilerInstance::createOutputFile(StringRef OutputPath, bool Binary,
   Expected<std::unique_ptr<raw_pwrite_stream>> OS =
       createOutputFileImpl(OutputPath, Binary, RemoveFileOnSignal, UseTemporary,
                            CreateMissingDirectories);
-  if (OS)
+
+  if (OS) {
+    if (DependencyScanningLoggerCallBack)
+      DependencyScanningLoggerCallBack(OutputPath);
+
     return std::move(*OS);
+  }
+
   getDiagnostics().Report(diag::err_fe_unable_to_open_output)
       << OutputPath << errorToErrorCode(OS.takeError()).message();
   return nullptr;
@@ -1262,6 +1269,11 @@ std::unique_ptr<CompilerInstance> CompilerInstance::cloneForModuleCompileImpl(
     Instance.setModuleDepCollector(getModuleDepCollector());
   }
   Inv.getDependencyOutputOpts() = DependencyOutputOptions();
+
+  if (DependencyScanningLoggerCallBack) {
+    Instance.setDependencyScanningLoggerCallBack(
+        DependencyScanningLoggerCallBack);
+  }
 
   return InstancePtr;
 }

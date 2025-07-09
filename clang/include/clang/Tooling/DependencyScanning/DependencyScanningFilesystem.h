@@ -344,10 +344,9 @@ public:
 
   void logCommand(const std::vector<std::string> &Commands);
   void logNegativeStatCachedPath(StringRef Path);
+  void logScanningPCMCreation(StringRef PCMPath);
   void markScanFinished();
 
-  // TBD
-  // void logScanningPCM();
 private:
   DependencyScanningWorkerFSLogger(std::unique_ptr<llvm::raw_fd_ostream> OS)
       : OS(std::move(OS)) {}

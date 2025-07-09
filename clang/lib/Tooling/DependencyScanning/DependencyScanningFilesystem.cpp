@@ -527,6 +527,10 @@ void DependencyScanningWorkerFSLogger::logNegativeStatCachedPath(
   (*OS) << "Negatively_caching: " << Path << "\n";
 }
 
+void DependencyScanningWorkerFSLogger::logScanningPCMCreation(StringRef Path) {
+  (*OS) << "PCM_created: " << Path << "\n";
+}
+
 void DependencyScanningWorkerFSLogger::markScanFinished() {
   (*OS) << "Scan_finished\n";
 }

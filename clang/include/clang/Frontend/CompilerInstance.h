@@ -180,6 +180,8 @@ class CompilerInstance : public ModuleLoader {
   /// The stream for verbose output.
   raw_ostream *VerboseOutputStream = &llvm::errs();
 
+  std::function<void(StringRef)> DependencyScanningLoggerCallBack;
+
   /// Holds information about the output file.
   ///
   /// If TempFilename is not empty we must rename it to Filename at the end.
@@ -919,6 +921,11 @@ public:
   void setExternalSemaSource(IntrusiveRefCntPtr<ExternalSemaSource> ESS);
 
   ModuleCache &getModuleCache() const { return *ModCache; }
+
+  void
+  setDependencyScanningLoggerCallBack(std::function<void(StringRef)> CallBack) {
+    DependencyScanningLoggerCallBack = std::move(CallBack);
+  }
 };
 
 } // end namespace clang

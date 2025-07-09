@@ -382,10 +382,11 @@ public:
       DependencyScanningService &Service, StringRef WorkingDirectory,
       DependencyConsumer &Consumer, DependencyActionController &Controller,
       llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS,
-      bool DisableFree, std::optional<StringRef> ModuleName = std::nullopt)
+      bool DisableFree, std::optional<StringRef> ModuleName = std::nullopt,
+      DependencyScanningWorkerFSLogger *FSLogger = nullptr)
       : Service(Service), WorkingDirectory(WorkingDirectory),
         Consumer(Consumer), Controller(Controller), DepFS(std::move(DepFS)),
-        DisableFree(DisableFree), ModuleName(ModuleName) {}
+        DisableFree(DisableFree), ModuleName(ModuleName), FSLogger(FSLogger) {}
 
   bool runInvocation(std::shared_ptr<CompilerInvocation> Invocation,
                      FileManager *DriverFileMgr,
@@ -534,6 +535,10 @@ public:
     // Avoid some checks and module map parsing when loading PCM files.
     ScanInstance.getPreprocessorOpts().ModulesCheckRelocated = false;
 
+    if (FSLogger)
+      ScanInstance.setDependencyScanningLoggerCallBack(
+          [&](StringRef Path) { FSLogger->logScanningPCMCreation(Path); });
+
     std::unique_ptr<FrontendAction> Action;
 
     if (Service.getFormat() == ScanningOutputFormat::P1689)
@@ -589,6 +594,7 @@ private:
   std::optional<CompilerInstance> ScanInstanceStorage;
   std::shared_ptr<ModuleDepCollector> MDC;
   std::vector<std::string> LastCC1Arguments;
+  DependencyScanningWorkerFSLogger *FSLogger = nullptr;
   bool Scanned = false;
   bool DiagConsumerFinished = false;
 };
@@ -764,7 +770,8 @@ bool DependencyScanningWorker::scanDependencies(
   // always true for a driver invocation.
   bool DisableFree = true;
   DependencyScanningAction Action(Service, WorkingDirectory, Consumer,
-                                  Controller, DepFS, DisableFree, ModuleName);
+                                  Controller, DepFS, DisableFree, ModuleName,
+                                  FSLogger.get());
 
   bool Success = false;
   if (CommandLine[1] == "-cc1") {
