@@ -131,18 +131,24 @@ DependencyScanningFilesystemSharedCache::getOutOfDateEntries(
           // later. The cache entry is not invalidated (as we have no good
           // way to do it now), which may lead to missing file build errors.
           InvalidDiagInfo.emplace_back(Path.data());
-        } else if (Status->getType() ==
-                   llvm::sys::fs::file_type::regular_file) {
-          // We only check regular files. Directory files sizes could change due
-          // to content changes, and reporting directory size changes can lead
-          // to false positives.
+        } else {
           llvm::vfs::Status CachedStatus = Entry->getStatus();
-          uint64_t CachedSize = CachedStatus.getSize();
-          uint64_t ActualSize = Status->getSize();
-          if (CachedSize != ActualSize) {
-            // This is the case where the cached file has a different size
-            // from the actual file that comes from the underlying FS.
-            InvalidDiagInfo.emplace_back(Path.data(), CachedSize, ActualSize);
+          if (Status->getType() == llvm::sys::fs::file_type::regular_file &&
+              Status->getType() == CachedStatus.getType()) {
+            // We only check regular files. Directory files sizes could change
+            // due to content changes, and reporting directory size changes can
+            // lead to false positives.
+            // TODO: At the moment, we do not detect symlinks to files whose
+            // size may change. We need to decide if we want to detect cached
+            // symlink size changes. We can also expand this to detect file
+            // type changes.
+            uint64_t CachedSize = CachedStatus.getSize();
+            uint64_t ActualSize = Status->getSize();
+            if (CachedSize != ActualSize) {
+              // This is the case where the cached file has a different size
+              // from the actual file that comes from the underlying FS.
+              InvalidDiagInfo.emplace_back(Path.data(), CachedSize, ActualSize);
+            }
           }
         }
       }

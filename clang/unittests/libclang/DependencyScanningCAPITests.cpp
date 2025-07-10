@@ -18,8 +18,7 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
   // This test is setup to have two out-of-date file system cache entries,
   // one is negatively stat cached, the other has its size changed.
   //  - `include/b.h` is negatively stat cached.
-  //  - `include` (the directory) has its size changed, because `b.h` is added
-  //     to it.
+  //  - `include/a.h` has its size changed.
 
   CXDependencyScannerServiceOptions ServiceOptions =
       clang_experimental_DependencyScannerServiceOptions_create();
@@ -79,10 +78,10 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
           Argc, Argv, /*ModuleName=*/nullptr, /*WorkingDirectory=*/Dir.c_str(),
           /*MLOContext=*/nullptr, /*MLO=*/nullptr);
 
-  CXDepGraph *Graph = new CXDepGraph;
+  CXDepGraph Graph = nullptr;
   CXErrorCode ScanResult =
       clang_experimental_DependencyScannerWorker_getDepGraph(
-          Worker, ScanSettings, Graph);
+          Worker, ScanSettings, &Graph);
   ASSERT_EQ(ScanResult, CXError_Success);
 
   // Change the size of include/a.h.
@@ -105,7 +104,7 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
   // Directory structure after the change.
   // - `/tmp/include/`
   //     - `a.h` ==> size has changed.
-  //     - `b.h`
+  //     - `b.h` ==> now created.
   // - `/tmp/include2/b.h`
 
   CXDepScanFSOutOfDateEntrySet Entries =
@@ -149,4 +148,9 @@ TEST(DependencyScanningCAPITests, DependencyScanningFSCacheOutOfDate) {
   EXPECT_TRUE(CheckedNegativelyCached && CheckedSizeChanged);
 
   clang_experimental_DepScanFSCacheOutOfDateEntrySet_disposeSet(Entries);
+  clang_experimental_DepGraph_dispose(Graph);
+  clang_experimental_DependencyScannerServiceOptions_dispose(ServiceOptions);
+  clang_experimental_DependencyScannerWorkerScanSettings_dispose(ScanSettings);
+  clang_experimental_DependencyScannerWorker_dispose_v0(Worker);
+  clang_experimental_DependencyScannerService_dispose_v0(Service);
 }
