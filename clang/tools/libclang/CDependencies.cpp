@@ -45,7 +45,6 @@ struct DependencyScannerServiceOptions {
 
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerServiceOptions,
                                    CXDependencyScannerServiceOptions)
-
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningService,
                                    CXDependencyScannerService)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningWorker,
@@ -814,5 +813,98 @@ bool clang_experimental_DepGraphModuleLinkLibrary_isFramework(
     CXDepGraphModuleLinkLibrary L) {
   const DepGraphModuleLinkLibrary *Lib = unwrap(L);
   return Lib->IsFramework;
+}
+
+
+namespace {
+typedef std::vector<DependencyScanningFilesystemSharedCache::OutOfDateEntry>
+    DependencyScannerFSOutOfDateEntrySet;
+
+typedef DependencyScanningFilesystemSharedCache::OutOfDateEntry
+    DependencyScannerFSOutOfDateEntry;
+} // namespace
+
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerFSOutOfDateEntrySet,
+                                   CXDepScanFSOutOfDateEntrySet)
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScannerFSOutOfDateEntry,
+                                   CXDepScanFSOutOfDateEntry)
+
+CXDepScanFSOutOfDateEntrySet
+clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
+    CXDependencyScannerService S) {
+  DependencyScanningService &Service = *unwrap(S);
+
+  // FIXME: CAS FS currently does not use the shared cache, and cannot produce
+  // the same diagnostics. We should add such a diagnostics to CAS as well.
+  if (Service.useCASFS())
+    return nullptr;
+
+  // Note that it is critical that this FS is the same as the default virtual
+  // file system we pass to the DependencyScanningWorkers.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
+      llvm::vfs::createPhysicalFileSystem();
+
+  DependencyScannerFSOutOfDateEntrySet *OODEntrySet =
+      new DependencyScannerFSOutOfDateEntrySet();
+  *OODEntrySet = Service.getSharedCache().getOutOfDateEntries(*FS);
+
+  return wrap(OODEntrySet);
+}
+
+size_t clang_experimental_DepScanFSCacheOutOfDateEntrySet_getNumOfEntries(
+    CXDepScanFSOutOfDateEntrySet Entries) {
+  return unwrap(Entries)->size();
+}
+
+CXDepScanFSOutOfDateEntry
+clang_experimental_DepScanFSCacheOutOfDateEntrySet_getEntry(
+    CXDepScanFSOutOfDateEntrySet Entries, size_t Idx) {
+  DependencyScannerFSOutOfDateEntrySet *EntSet = unwrap(Entries);
+  return wrap(&(*EntSet)[Idx]);
+}
+
+CXDepScanFSCacheOutOfDateKind
+clang_experimental_DepScanFSCacheOutOfDateEntry_getKind(
+    CXDepScanFSOutOfDateEntry Entry) {
+  DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
+  auto &Info = E->Info;
+  return std::visit(
+      llvm::makeVisitor(
+          [](const DependencyScannerFSOutOfDateEntry::NegativelyCachedInfo
+                 &Info) { return NegativelyCached; },
+          [](const DependencyScannerFSOutOfDateEntry::SizeChangedInfo &Info) {
+            return SizeChanged;
+          }),
+      Info);
+}
+
+CXString clang_experimental_DepScanFSCacheOutOfDateEntry_getPath(
+    CXDepScanFSOutOfDateEntry Entry) {
+  return cxstring::createRef(unwrap(Entry)->Path);
+}
+
+static DependencyScannerFSOutOfDateEntry::SizeChangedInfo *
+getOutOfDateEntrySizeChangedInfo(DependencyScannerFSOutOfDateEntry *E) {
+  auto *SizeInfo =
+      std::get_if<DependencyScannerFSOutOfDateEntry::SizeChangedInfo>(&E->Info);
+  assert(SizeInfo && "Wrong entry kind to get size changed info!");
+  return SizeInfo;
+}
+
+uint64_t clang_experimental_DepScanFSCacheOutOfDateEntry_getCachedSize(
+    CXDepScanFSOutOfDateEntry Entry) {
+  DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
+  return getOutOfDateEntrySizeChangedInfo(E)->CachedSize;
+}
+
+uint64_t clang_experimental_DepScanFSCacheOutOfDateEntry_getActualSize(
+    CXDepScanFSOutOfDateEntry Entry) {
+  DependencyScannerFSOutOfDateEntry *E = unwrap(Entry);
+  return getOutOfDateEntrySizeChangedInfo(E)->ActualSize;
+}
+
+void clang_experimental_DepScanFSCacheOutOfDateEntrySet_disposeSet(
+    CXDepScanFSOutOfDateEntrySet Entries) {
+  delete unwrap(Entries);
 }
 

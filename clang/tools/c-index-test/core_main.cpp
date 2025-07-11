@@ -916,6 +916,20 @@ static int scanDeps(ArrayRef<const char *> Args, std::string WorkingDirectory,
     clang_disposeString(Spelling);
     clang_disposeDiagnostic(Diag);
   }
+
+  CXDepScanFSOutOfDateEntrySet OutOfDateEntrySet =
+      clang_experimental_DependencyScannerService_getFSCacheOutOfDateEntrySet(
+          Service);
+
+  llvm::errs()
+      << "note: number of out of date file system cache entries: "
+      << clang_experimental_DepScanFSCacheOutOfDateEntrySet_getNumOfEntries(
+             OutOfDateEntrySet)
+      << "\n";
+
+  clang_experimental_DepScanFSCacheOutOfDateEntrySet_disposeSet(
+      OutOfDateEntrySet);
+
   return 1;
 }
 
