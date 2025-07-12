@@ -8,4 +8,7 @@ module ModA {
       header "SubSubModA.h"
     }
   }
+
+  link framework "libModA"
+  link "libModB"
 }
