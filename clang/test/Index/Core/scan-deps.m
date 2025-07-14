@@ -32,6 +32,7 @@
 // CHECK-NEXT:     link libraries:
 // CHECK-NEXT:         libModA(framework)
 // CHECK-NEXT:         libModB
+// CHECK-NEXT:         /absolute/path/to/a/lib/file
 // CHECK-NEXT:     build-args: {{.*}} -emit-module {{.*}} -fmodule-name=ModA {{.*}} -fno-implicit-modules {{.*}}
 
 // CHECK-NEXT: dependencies:

@@ -882,7 +882,7 @@ static int scanDeps(ArrayRef<const char *> Args, std::string WorkingDirectory,
                   LinkLibs, Idx);
           CXString Library =
               clang_experimental_DepGraphModuleLinkLibrary_getLibrary(Lib);
-          int IsFramework =
+          bool IsFramework =
               clang_experimental_DepGraphModuleLinkLibrary_isFramework(Lib);
           const char *IsFrameworkStr = IsFramework ? "(framework)" : "";
           llvm::outs() << "        " << clang_getCString(Library)

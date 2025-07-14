@@ -11,4 +11,5 @@ module ModA {
 
   link framework "libModA"
   link "libModB"
+  link "/absolute/path/to/a/lib/file"
 }
