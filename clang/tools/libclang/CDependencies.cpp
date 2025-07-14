@@ -919,8 +919,8 @@ CXString clang_experimental_DepGraphModuleLinkLibrary_getLibrary(
   return cxstring::createRef(Lib->Library.c_str());
 }
 
-int clang_experimental_DepGraphModuleLinkLibrary_isFramework(
+bool clang_experimental_DepGraphModuleLinkLibrary_isFramework(
     CXDepGraphModuleLinkLibrary L) {
   const DepGraphModuleLinkLibrary *Lib = unwrap(L);
-  return Lib->IsFramework ? 1 : 0;
+  return Lib->IsFramework;
 }

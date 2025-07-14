@@ -776,9 +776,10 @@ CINDEX_LINKAGE CXString clang_experimental_DepGraphModuleLinkLibrary_getLibrary(
     CXDepGraphModuleLinkLibrary);
 
 /**
- * Returns 1 if the \c CXDepGraphModuleLinkLibrary is a framework, 0 otherwise.
+ * Returns true if the \c CXDepGraphModuleLinkLibrary is a framework, false
+ * otherwise.
  */
-CINDEX_LINKAGE int clang_experimental_DepGraphModuleLinkLibrary_isFramework(
+CINDEX_LINKAGE bool clang_experimental_DepGraphModuleLinkLibrary_isFramework(
     CXDepGraphModuleLinkLibrary);
 
 /**
