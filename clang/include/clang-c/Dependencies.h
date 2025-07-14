@@ -734,8 +734,8 @@ clang_experimental_DependencyScanner_generateReproducer(
     CXDependencyScannerReproducerOptions CXOptions, CXString *MessageOut);
 
 /**
- * An opaque object that contains a \c CXDepGraphModule 'st link library
- * information.
+ * An opaque object that contains a \c CXDepGraphModule 's list of link
+ * libraries.
  */
 typedef struct CXOpaqueDepGraphModuleLinkLibrarySet
     *CXDepGraphModuleLinkLibrarySet;
@@ -768,7 +768,7 @@ clang_experimental_DepGraphModuleLinkLibrarySet_getLinkLibrary(
     CXDepGraphModuleLinkLibrarySet, size_t Idx);
 
 /**
- *  Get the `Library` string from the \c CXDepGraphModuleLinkLibrary.
+ *  Get the `Library` string from the \c CXDepGraphModuleLinkLibrary instance.
  *  `Library` could be the library name, or an absolute path to a library or a
  * framework.
  */
