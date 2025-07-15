@@ -575,6 +575,11 @@ LLVM_21 {
     clang_experimental_DependencyScannerServiceOptions_setCWDOptimization;
     clang_experimental_DepGraphModule_isCWDIgnored;
     clang_experimental_DepGraphModule_isInStableDirs; 
+    clang_experimental_DepGraphModule_getLinkLibrarySet;
+    clang_experimental_DepGraphModuleLinkLibrarySet_getSize;
+    clang_experimental_DepGraphModuleLinkLibrarySet_getLinkLibrary;
+    clang_experimental_DepGraphModuleLinkLibrary_getLibrary;
+    clang_experimental_DepGraphModuleLinkLibrary_isFramework;
 };
 
 # Example of how to add a new symbol version entry.  If you do add a new symbol
