@@ -1735,7 +1735,7 @@ void SwiftLanguageRuntime::WillStartExecutingUserExpression(
   Log *log(GetLog(LLDBLog::Expressions));
   LLDB_LOG(log,
            "SwiftLanguageRuntime: starting user expression. "
-           "Number active: %u",
+           "Number active: {0}",
            m_active_user_expr_count + 1);
   if (m_active_user_expr_count++ > 0)
     return;
@@ -1777,7 +1777,7 @@ void SwiftLanguageRuntime::WillStartExecutingUserExpression(
   if (error.Fail()) {
     LLDB_LOG(log,
              "SwiftLanguageRuntime: Unable to read disableExclusivityChecking "
-             "flag state: %s",
+             "flag state: {0}",
              error.AsCString());
     return;
   }
@@ -1788,14 +1788,14 @@ void SwiftLanguageRuntime::WillStartExecutingUserExpression(
   if (error.Fail()) {
     LLDB_LOG(log,
              "SwiftLanguageRuntime: Unable to set disableExclusivityChecking "
-             "flag state: %s",
+             "flag state: {0}",
              error.AsCString());
     return;
   }
 
   LLDB_LOG(log,
            "SwiftLanguageRuntime: Changed disableExclusivityChecking flag "
-           "state from %u to 1",
+           "state from {0} to 1",
            m_original_dynamic_exclusivity_flag_state);
 }
 
@@ -1810,7 +1810,7 @@ void SwiftLanguageRuntime::DidFinishExecutingUserExpression(
   --m_active_user_expr_count;
   LLDB_LOG(log,
            "SwiftLanguageRuntime: finished user expression. "
-           "Number active: %u",
+           "Number active: {0}",
            m_active_user_expr_count);
 
   if (m_active_user_expr_count > 0)
@@ -1850,14 +1850,14 @@ void SwiftLanguageRuntime::DidFinishExecutingUserExpression(
   if (error.Fail()) {
     LLDB_LOG(log,
              "SwiftLanguageRuntime: Unable to reset "
-             "disableExclusivityChecking flag state: %s",
+             "disableExclusivityChecking flag state: {0}",
              error.AsCString());
     return;
   }
   if (log)
     LLDB_LOG(log,
              "SwiftLanguageRuntime: Changed "
-             "disableExclusivityChecking flag state back to %u",
+             "disableExclusivityChecking flag state back to {0}",
              m_original_dynamic_exclusivity_flag_state);
 }
 
