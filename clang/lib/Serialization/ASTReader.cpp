@@ -6106,7 +6106,7 @@ bool ASTReader::readASTFileControlBlock(
                 AdditionalPathBuf, UnresolvedFilename, ModuleDir);
             Filename = *FilenameBuf;
           }
-          shouldContinue = Listener.visitInputFile(
+          shouldContinue = Listener.visitInputFileAsRequested(
               *FilenameAsRequestedBuf, Filename, isSystemFile, Overridden,
               /*IsExplicitModule=*/false);
           break;
