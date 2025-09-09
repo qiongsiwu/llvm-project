@@ -1627,6 +1627,8 @@ size_t SymbolFileNativePDB::ParseBlocksRecursive(Function &func) {
   for (uint64_t uid : remove_uids) {
     m_inline_sites.erase(uid);
   }
+
+  func.GetBlock(false).SetBlockInfoHasBeenParsed(true, true);
   return count;
 }
 
