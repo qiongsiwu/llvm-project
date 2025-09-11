@@ -971,27 +971,6 @@ namespace {
     /// fold (not just why it's not strictly a constant expression)?
     bool HasFoldFailureDiagnostic;
 
-    enum EvaluationMode {
-      /// Evaluate as a constant expression. Stop if we find that the expression
-      /// is not a constant expression.
-      EM_ConstantExpression,
-
-      /// Evaluate as a constant expression. Stop if we find that the expression
-      /// is not a constant expression. Some expressions can be retried in the
-      /// optimizer if we don't constant fold them here, but in an unevaluated
-      /// context we try to fold them immediately since the optimizer never
-      /// gets a chance to look at it.
-      EM_ConstantExpressionUnevaluated,
-
-      /// Fold the expression to a constant. Stop if we hit a side-effect that
-      /// we can't model.
-      EM_ConstantFold,
-
-      /// Evaluate in any way we know how. Don't worry about side-effects that
-      /// can't be modeled.
-      EM_IgnoreSideEffects,
-    } EvalMode;
-
     EvalInfo(const ASTContext &C, Expr::EvalStatus &S, EvaluationMode Mode)
         : Ctx(const_cast<ASTContext &>(C)), EvalStatus(S), CurrentCall(nullptr),
           CallStackDepth(0), NextCallIndex(1),
@@ -1002,7 +981,9 @@ namespace {
                       /*CallExpr=*/nullptr, CallRef()),
           EvaluatingDecl((const ValueDecl *)nullptr),
           EvaluatingDeclValue(nullptr), HasActiveDiagnostic(false),
-          HasFoldFailureDiagnostic(false), EvalMode(Mode) {}
+          HasFoldFailureDiagnostic(false) {
+      EvalMode = Mode;
+    }
 
     ~EvalInfo() {
       discardCleanups();
@@ -1177,18 +1158,18 @@ namespace {
     // unless we require this evaluation to produce a constant expression.
     //
     // FIXME: We might want to show both diagnostics to the user in
-    // EM_ConstantFold mode.
+    // EvaluationMode::ConstantFold mode.
     bool hasPriorDiagnostic() override {
       if (!EvalStatus.Diag->empty()) {
         switch (EvalMode) {
-        case EM_ConstantFold:
-        case EM_IgnoreSideEffects:
+        case EvaluationMode::ConstantFold:
+        case EvaluationMode::IgnoreSideEffects:
           if (!HasFoldFailureDiagnostic)
             break;
           // We've already failed to fold something. Keep that diagnostic.
           [[fallthrough]];
-        case EM_ConstantExpression:
-        case EM_ConstantExpressionUnevaluated:
+        case EvaluationMode::ConstantExpression:
+        case EvaluationMode::ConstantExpressionUnevaluated:
           setActiveDiagnostic(false);
           return true;
         }
@@ -1203,12 +1184,12 @@ namespace {
     /// couldn't model?
     bool keepEvaluatingAfterSideEffect() const override {
       switch (EvalMode) {
-      case EM_IgnoreSideEffects:
+      case EvaluationMode::IgnoreSideEffects:
         return true;
 
-      case EM_ConstantExpression:
-      case EM_ConstantExpressionUnevaluated:
-      case EM_ConstantFold:
+      case EvaluationMode::ConstantExpression:
+      case EvaluationMode::ConstantExpressionUnevaluated:
+      case EvaluationMode::ConstantFold:
         // By default, assume any side effect might be valid in some other
         // evaluation of this expression from a different context.
         return checkingPotentialConstantExpression() ||
@@ -1227,12 +1208,12 @@ namespace {
     /// Should we continue evaluation after encountering undefined behavior?
     bool keepEvaluatingAfterUndefinedBehavior() {
       switch (EvalMode) {
-      case EM_IgnoreSideEffects:
-      case EM_ConstantFold:
+      case EvaluationMode::IgnoreSideEffects:
+      case EvaluationMode::ConstantFold:
         return true;
 
-      case EM_ConstantExpression:
-      case EM_ConstantExpressionUnevaluated:
+      case EvaluationMode::ConstantExpression:
+      case EvaluationMode::ConstantExpressionUnevaluated:
         return checkingForUndefinedBehavior();
       }
       llvm_unreachable("Missed EvalMode case");
@@ -1253,10 +1234,10 @@ namespace {
         return false;
 
       switch (EvalMode) {
-      case EM_ConstantExpression:
-      case EM_ConstantExpressionUnevaluated:
-      case EM_ConstantFold:
-      case EM_IgnoreSideEffects:
+      case EvaluationMode::ConstantExpression:
+      case EvaluationMode::ConstantExpressionUnevaluated:
+      case EvaluationMode::ConstantFold:
+      case EvaluationMode::IgnoreSideEffects:
         return checkingPotentialConstantExpression() ||
                checkingForUndefinedBehavior();
       }
@@ -1306,7 +1287,7 @@ namespace {
     EvalInfo &Info;
     bool Enabled;
     bool HadNoPriorDiags;
-    EvalInfo::EvaluationMode OldMode;
+    EvaluationMode OldMode;
 
     explicit FoldConstant(EvalInfo &Info, bool Enabled)
       : Info(Info),
@@ -1316,7 +1297,7 @@ namespace {
                         !Info.EvalStatus.HasSideEffects),
         OldMode(Info.EvalMode) {
       if (Enabled)
-        Info.EvalMode = EvalInfo::EM_ConstantFold;
+        Info.EvalMode = EvaluationMode::ConstantFold;
     }
     void keepDiagnostics() { Enabled = false; }
     ~FoldConstant() {
@@ -1331,10 +1312,10 @@ namespace {
   /// side-effects.
   struct IgnoreSideEffectsRAII {
     EvalInfo &Info;
-    EvalInfo::EvaluationMode OldMode;
+    EvaluationMode OldMode;
     explicit IgnoreSideEffectsRAII(EvalInfo &Info)
         : Info(Info), OldMode(Info.EvalMode) {
-      Info.EvalMode = EvalInfo::EM_IgnoreSideEffects;
+      Info.EvalMode = EvaluationMode::IgnoreSideEffects;
     }
 
     ~IgnoreSideEffectsRAII() { Info.EvalMode = OldMode; }
@@ -2093,7 +2074,7 @@ static uint64_t evaluateIncompleteArraySize(const ASTContext &C, QualType T) {
 
   APSInt Result;
   Expr::EvalStatus Status;
-  EvalInfo Info(C, Status, EvalInfo::EM_ConstantExpression);
+  EvalInfo Info(C, Status, EvaluationMode::ConstantExpression);
   if (!EvaluateInteger(DCPT->getCountExpr(), Result, Info))
     return 0;
 
@@ -9396,7 +9377,7 @@ bool LValueExprEvaluator::VisitMaterializeTemporaryExpr(
   // value for use outside this evaluation.
   APValue *Value;
   if (E->getStorageDuration() == SD_Static) {
-    if (Info.EvalMode == EvalInfo::EM_ConstantFold)
+    if (Info.EvalMode == EvaluationMode::ConstantFold)
       return false;
     // FIXME: What about SD_Thread?
     Value = E->getOrCreateValue(true);
@@ -13993,12 +13974,12 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     // Expression had no side effects, but we couldn't statically determine the
     // size of the referenced object.
     switch (Info.EvalMode) {
-    case EvalInfo::EM_ConstantExpression:
-    case EvalInfo::EM_ConstantFold:
-    case EvalInfo::EM_IgnoreSideEffects:
+    case EvaluationMode::ConstantExpression:
+    case EvaluationMode::ConstantFold:
+    case EvaluationMode::IgnoreSideEffects:
       // Leave it to IR generation.
       return Error(E);
-    case EvalInfo::EM_ConstantExpressionUnevaluated:
+    case EvaluationMode::ConstantExpressionUnevaluated:
       // Reduce it to a constant now.
       return Success((Type & 2) ? 0 : -1, E);
     }
@@ -18012,7 +17993,7 @@ bool Expr::EvaluateAsRValue(EvalResult &Result, const ASTContext &Ctx,
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateAsRValue");
-  EvalInfo Info(Ctx, Result, EvalInfo::EM_IgnoreSideEffects);
+  EvalInfo Info(Ctx, Result, EvaluationMode::IgnoreSideEffects);
   Info.InConstantContext = InConstantContext;
   return ::EvaluateAsRValue(this, Result, Ctx, Info);
 }
@@ -18033,7 +18014,7 @@ bool Expr::EvaluateAsInt(EvalResult &Result, const ASTContext &Ctx,
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateAsInt");
-  EvalInfo Info(Ctx, Result, EvalInfo::EM_IgnoreSideEffects);
+  EvalInfo Info(Ctx, Result, EvaluationMode::IgnoreSideEffects);
   Info.InConstantContext = InConstantContext;
   return ::EvaluateAsInt(this, Result, Ctx, AllowSideEffects, Info);
 }
@@ -18044,7 +18025,7 @@ bool Expr::EvaluateAsFixedPoint(EvalResult &Result, const ASTContext &Ctx,
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateAsFixedPoint");
-  EvalInfo Info(Ctx, Result, EvalInfo::EM_IgnoreSideEffects);
+  EvalInfo Info(Ctx, Result, EvaluationMode::IgnoreSideEffects);
   Info.InConstantContext = InConstantContext;
   return ::EvaluateAsFixedPoint(this, Result, Ctx, AllowSideEffects, Info);
 }
@@ -18075,7 +18056,7 @@ bool Expr::EvaluateAsLValue(EvalResult &Result, const ASTContext &Ctx,
          "Expression evaluator can't be called on a dependent expression.");
 
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateAsLValue");
-  EvalInfo Info(Ctx, Result, EvalInfo::EM_ConstantFold);
+  EvalInfo Info(Ctx, Result, EvaluationMode::ConstantFold);
   Info.InConstantContext = InConstantContext;
   LValue LV;
   CheckedTemporaries CheckedTemps;
@@ -18095,8 +18076,8 @@ static bool EvaluateDestruction(const ASTContext &Ctx, APValue::LValueBase Base,
                                 SourceLocation Loc, Expr::EvalStatus &EStatus,
                                 bool IsConstantDestruction) {
   EvalInfo Info(Ctx, EStatus,
-                IsConstantDestruction ? EvalInfo::EM_ConstantExpression
-                                      : EvalInfo::EM_ConstantFold);
+                IsConstantDestruction ? EvaluationMode::ConstantExpression
+                                      : EvaluationMode::ConstantFold);
   Info.setEvaluatingDecl(Base, DestroyedValue,
                          EvalInfo::EvaluatingDeclKind::Dtor);
   Info.InConstantContext = IsConstantDestruction;
@@ -18124,7 +18105,7 @@ bool Expr::EvaluateAsConstantExpr(EvalResult &Result, const ASTContext &Ctx,
     return true;
 
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateAsConstantExpr");
-  EvalInfo::EvaluationMode EM = EvalInfo::EM_ConstantExpression;
+  EvaluationMode EM = EvaluationMode::ConstantExpression;
   EvalInfo Info(Ctx, Result, EM);
   Info.InConstantContext = true;
 
@@ -18201,8 +18182,8 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
   EvalInfo Info(Ctx, EStatus,
                 (IsConstantInitialization &&
                  (Ctx.getLangOpts().CPlusPlus || Ctx.getLangOpts().C23))
-                    ? EvalInfo::EM_ConstantExpression
-                    : EvalInfo::EM_ConstantFold);
+                    ? EvaluationMode::ConstantExpression
+                    : EvaluationMode::ConstantFold);
   Info.setEvaluatingDecl(VD, Value);
   Info.InConstantContext = IsConstantInitialization;
 
@@ -18297,7 +18278,7 @@ APSInt Expr::EvaluateKnownConstInt(const ASTContext &Ctx,
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateKnownConstInt");
   EvalResult EVResult;
   EVResult.Diag = Diag;
-  EvalInfo Info(Ctx, EVResult, EvalInfo::EM_IgnoreSideEffects);
+  EvalInfo Info(Ctx, EVResult, EvaluationMode::IgnoreSideEffects);
   Info.InConstantContext = true;
 
   bool Result = ::EvaluateAsRValue(this, EVResult, Ctx, Info);
@@ -18316,7 +18297,7 @@ APSInt Expr::EvaluateKnownConstIntCheckOverflow(
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateKnownConstIntCheckOverflow");
   EvalResult EVResult;
   EVResult.Diag = Diag;
-  EvalInfo Info(Ctx, EVResult, EvalInfo::EM_IgnoreSideEffects);
+  EvalInfo Info(Ctx, EVResult, EvaluationMode::IgnoreSideEffects);
   Info.InConstantContext = true;
   Info.CheckingForUndefinedBehavior = true;
 
@@ -18336,7 +18317,7 @@ void Expr::EvaluateForOverflow(const ASTContext &Ctx) const {
   bool IsConst;
   EvalResult EVResult;
   if (!FastEvaluateAsRValue(this, EVResult.Val, Ctx, IsConst)) {
-    EvalInfo Info(Ctx, EVResult, EvalInfo::EM_IgnoreSideEffects);
+    EvalInfo Info(Ctx, EVResult, EvaluationMode::IgnoreSideEffects);
     Info.CheckingForUndefinedBehavior = true;
     (void)::EvaluateAsRValue(Info, this, EVResult.Val);
   }
@@ -18390,7 +18371,7 @@ static ICEDiag Worst(ICEDiag A, ICEDiag B) { return A.Kind >= B.Kind ? A : B; }
 static ICEDiag CheckEvalInICE(const Expr* E, const ASTContext &Ctx) {
   Expr::EvalResult EVResult;
   Expr::EvalStatus Status;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantExpression);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantExpression);
 
   Info.InConstantContext = true;
   if (!::EvaluateAsRValue(E, EVResult, Ctx, Info) || EVResult.HasSideEffects ||
@@ -18885,7 +18866,7 @@ Expr::getIntegerConstantExpr(const ASTContext &Ctx) const {
   // value.
   EvalResult ExprResult;
   Expr::EvalStatus Status;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_IgnoreSideEffects);
+  EvalInfo Info(Ctx, Status, EvaluationMode::IgnoreSideEffects);
   Info.InConstantContext = true;
 
   if (!::EvaluateAsInt(this, ExprResult, Ctx, SE_AllowSideEffects, Info))
@@ -18921,7 +18902,7 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue *Result) const {
   Expr::EvalStatus Status;
   SmallVector<PartialDiagnosticAt, 8> Diags;
   Status.Diag = &Diags;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantExpression);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantExpression);
 
   bool IsConstExpr =
       ::EvaluateAsRValue(Info, this, Result ? *Result : Scratch) &&
@@ -18948,7 +18929,7 @@ bool Expr::EvaluateWithSubstitution(APValue &Value, ASTContext &Ctx,
   });
 
   Expr::EvalStatus Status;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantExpressionUnevaluated);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantExpressionUnevaluated);
   Info.InConstantContext = true;
 
   LValue ThisVal;
@@ -19024,7 +19005,8 @@ bool Expr::isPotentialConstantExpr(const FunctionDecl *FD,
   Expr::EvalStatus Status;
   Status.Diag = &Diags;
 
-  EvalInfo Info(FD->getASTContext(), Status, EvalInfo::EM_ConstantExpression);
+  EvalInfo Info(FD->getASTContext(), Status,
+                EvaluationMode::ConstantExpression);
   Info.InConstantContext = true;
   Info.CheckingPotentialConstantExpression = true;
 
@@ -19074,7 +19056,7 @@ bool Expr::isPotentialConstantExprUnevaluated(Expr *E,
   Status.Diag = &Diags;
 
   EvalInfo Info(FD->getASTContext(), Status,
-                EvalInfo::EM_ConstantExpressionUnevaluated);
+                EvaluationMode::ConstantExpressionUnevaluated);
   Info.InConstantContext = true;
   Info.CheckingPotentialConstantExpression = true;
 
@@ -19098,7 +19080,7 @@ bool Expr::tryEvaluateObjectSize(uint64_t &Result, ASTContext &Ctx,
     return false;
 
   Expr::EvalStatus Status;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantFold);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantFold);
   return tryEvaluateBuiltinObjectSize(this, Type, Info, Result);
 }
 
@@ -19156,7 +19138,7 @@ static bool EvaluateBuiltinStrLen(const Expr *E, uint64_t &Result,
 
 std::optional<std::string> Expr::tryEvaluateString(ASTContext &Ctx) const {
   Expr::EvalStatus Status;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantFold);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantFold);
   uint64_t Result;
   std::string StringResult;
 
@@ -19171,7 +19153,7 @@ static bool EvaluateCharRangeAsStringImpl(const Expr *, T &Result,
                                           const Expr *PtrExpression,
                                           ASTContext &Ctx,
                                           Expr::EvalResult &Status) {
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantExpression);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantExpression);
   Info.InConstantContext = true;
 
   if (Info.EnableNewConstInterp)
@@ -19239,7 +19221,7 @@ bool Expr::EvaluateCharRangeAsString(APValue &Result,
 
 bool Expr::tryEvaluateStrLen(uint64_t &Result, ASTContext &Ctx) const {
   Expr::EvalStatus Status;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantFold);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantFold);
 
   if (Info.EnableNewConstInterp)
     return Info.Ctx.getInterpContext().evaluateStrlen(Info, this, Result);
@@ -19325,7 +19307,7 @@ static bool EvaluateTerminatorElement(const Expr *E, APValue &Result,
 bool Expr::tryEvaluateTerminatorElement(EvalResult &Result,
                                         const ASTContext &Ctx) const {
   Expr::EvalStatus Status;
-  EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantFold);
+  EvalInfo Info(Ctx, Status, EvaluationMode::ConstantFold);
   return EvaluateTerminatorElement(this, Result.Val, Info);
 }
 
