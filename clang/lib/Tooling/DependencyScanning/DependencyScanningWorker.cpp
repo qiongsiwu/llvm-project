@@ -607,10 +607,9 @@ public:
 
     // Use the dependency scanning optimized file system if requested to do so.
     if (DepFS) {
-      SmallString<256> ModulesCachePath;
-      CompilerInstance::normalizeModuleCachePath(
-          *FileMgr, ScanInstance.getHeaderSearchOpts().ModuleCachePath,
-          ModulesCachePath);
+      StringRef ModulesCachePath =
+          ScanInstance.getHeaderSearchOpts().ModuleCachePath;
+
       DepFS->resetBypassedPathPrefix();
       if (!ModulesCachePath.empty())
         DepFS->setBypassedPathPrefix(ModulesCachePath);
