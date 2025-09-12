@@ -318,7 +318,7 @@ lldb::addr_t SBFrame::GetCFA() const {
 
   StackFrame *frame = exe_ctx.GetFramePtr();
   if (frame)
-    return frame->GetStackID().GetCallFrameAddress();
+    return frame->GetStackID().GetCallFrameAddressWithoutMetadata();
   return LLDB_INVALID_ADDRESS;
 }
 
