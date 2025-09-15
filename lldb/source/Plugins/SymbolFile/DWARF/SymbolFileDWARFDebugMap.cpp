@@ -1289,21 +1289,10 @@ CompilerDeclContext SymbolFileDWARFDebugMap::FindNamespace(
   return matching_namespace;
 }
 
-bool SymbolFileDWARFDebugMap::GetCompileOption(const char *option,
-                                               std::string &value,
-                                               CompileUnit *cu) {
-  bool success = false;
-  ForEachSymbolFile("Getting compile option", [&](SymbolFileDWARF &oso_dwarf) {
-    success |= oso_dwarf.GetCompileOption(option, value, cu);
-    return success ? IterationAction::Stop
-                              : IterationAction::Continue;
-  });
-  return success;
-}
-
-void SymbolFileDWARFDebugMap::DumpClangAST(Stream &s, llvm::StringRef filter) {
+void SymbolFileDWARFDebugMap::DumpClangAST(Stream &s, llvm::StringRef filter,
+                                           bool show_color) {
   ForEachSymbolFile("Dumping clang AST", [&](SymbolFileDWARF &oso_dwarf) {
-    oso_dwarf.DumpClangAST(s, filter);
+    oso_dwarf.DumpClangAST(s, filter, show_color);
     // The underlying assumption is that DumpClangAST(...) will obtain the
     // AST from the underlying TypeSystem and therefore we only need to do
     // this once and can stop after the first iteration hence we return true.
