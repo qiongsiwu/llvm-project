@@ -104,6 +104,8 @@ enum class SymbolSubKind : uint8_t {
   SwiftAssociatedType,
   SwiftGenericTypeParam,
   SwiftAccessorInit,
+  SwiftAccessorBorrow,
+  SwiftAccessorMutate,
 };
 
 typedef uint32_t SymbolPropertySet;
