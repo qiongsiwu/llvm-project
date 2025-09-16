@@ -279,7 +279,7 @@ Expected<MappedFileRegionArena> MappedFileRegionArena::create(
 
   // Release the shared lock so it can be closed in destoryImpl().
   SharedFileLock->release();
-  return Result;
+  return std::move(Result);
 }
 
 void MappedFileRegionArena::destroyImpl() {
