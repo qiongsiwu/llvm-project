@@ -22,6 +22,7 @@ namespace llvm {
 class TargetLowering;
 class AArch64FunctionInfo;
 class AArch64PrologueEmitter;
+class AArch64EpilogueEmitter;
 
 class AArch64FrameLowering : public TargetFrameLowering {
 public:
@@ -134,7 +135,6 @@ public:
     return StackId != TargetStackID::ScalableVector;
   }
 
-  friend class AArch64PrologueEmitter;
   void
   orderFrameObjects(const MachineFunction &MF,
                     SmallVectorImpl<int> &ObjectsToAllocate) const override;
@@ -146,6 +146,9 @@ public:
   bool requiresSaveVG(const MachineFunction &MF) const;
 
   StackOffset getSVEStackSize(const MachineFunction &MF) const;
+
+  friend class AArch64PrologueEmitter;
+  friend class AArch64EpilogueEmitter;
 
 protected:
   bool hasFPImpl(const MachineFunction &MF) const override;
@@ -179,10 +182,6 @@ private:
 
   bool shouldCombineCSRLocalStackBumpInEpilogue(MachineBasicBlock &MBB,
                                                 uint64_t StackBumpBytes) const;
-  void emitCalleeSavedGPRRestores(MachineBasicBlock &MBB,
-                                  MachineBasicBlock::iterator MBBI) const;
-  void emitCalleeSavedSVERestores(MachineBasicBlock &MBB,
-                                  MachineBasicBlock::iterator MBBI) const;
   void allocateStackSpace(MachineBasicBlock &MBB,
                           MachineBasicBlock::iterator MBBI,
                           int64_t RealignmentPadding, StackOffset AllocSize,
@@ -224,6 +223,15 @@ private:
   StackOffset getStackOffset(const MachineFunction &MF,
                              int64_t ObjectOffset) const;
 
+  /// Returns how much of the incoming argument stack area (in bytes) we should
+  /// clean up in an epilogue. For the C calling convention this will be 0, for
+  /// guaranteed tail call conventions it can be positive (a normal return or a
+  /// tail call to a function that uses less stack space for arguments) or
+  /// negative (for a tail call to a function that needs more stack space than
+  /// us for arguments).
+  int64_t getArgumentStackToRestore(MachineFunction &MF,
+                                    MachineBasicBlock &MBB) const;
+
   // Find a scratch register that we can use at the start of the prologue to
   // re-align the stack pointer.  We avoid using callee-save registers since
   // they may appear to be free when this is called from canUseAsPrologue
@@ -254,6 +262,9 @@ private:
                                          uint64_t LocalStackSize,
                                          bool NeedsWinCFI,
                                          bool *HasWinCFI) const;
+
+  void fixupCalleeSaveRestoreToFPBased(MachineInstr &MI,
+                                       int64_t FPSPOffset) const;
 
   bool isSVECalleeSave(MachineBasicBlock::iterator I) const;
 
