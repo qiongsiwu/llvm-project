@@ -143,9 +143,6 @@ public:
   bool GetSeparateDebugInfo(StructuredData::Dictionary &d, bool errors_only,
                             bool load_all_debug_info = false) override;
 
-  bool GetCompileOption(const char *option, std::string &value,
-                        CompileUnit *cu) override;
-
   // PluginInterface protocol
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
@@ -402,6 +399,9 @@ protected:
 
   size_t AddOSOARanges(SymbolFileDWARF *dwarf2Data,
                        DWARFDebugAranges *debug_aranges);
+
+  std::vector<lldb::DataBufferSP>
+  GetASTData(lldb::LanguageType language) override;
 };
 } // namespace dwarf
 } // namespace lldb_private::plugin
