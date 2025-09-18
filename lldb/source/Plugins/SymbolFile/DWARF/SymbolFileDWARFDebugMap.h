@@ -136,17 +136,12 @@ public:
   std::vector<std::unique_ptr<CallEdge>>
   ParseCallEdgesInFunction(UserID func_id) override;
 
-  std::vector<lldb::DataBufferSP>
-  GetASTData(lldb::LanguageType language) override;
-
-  void DumpClangAST(Stream &s, llvm::StringRef filter) override;
+  void DumpClangAST(Stream &s, llvm::StringRef filter,
+                    bool show_color) override;
 
   /// List separate oso files.
   bool GetSeparateDebugInfo(StructuredData::Dictionary &d, bool errors_only,
                             bool load_all_debug_info = false) override;
-
-  bool GetCompileOption(const char *option, std::string &value,
-                        CompileUnit *cu) override;
 
   // PluginInterface protocol
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
@@ -404,6 +399,9 @@ protected:
 
   size_t AddOSOARanges(SymbolFileDWARF *dwarf2Data,
                        DWARFDebugAranges *debug_aranges);
+
+  std::vector<lldb::DataBufferSP>
+  GetASTData(lldb::LanguageType language) override;
 };
 } // namespace dwarf
 } // namespace lldb_private::plugin
