@@ -1040,7 +1040,7 @@ public:
 
   std::pair<std::shared_ptr<llvm::cas::ObjectStore>,
             std::shared_ptr<llvm::cas::ActionCache>>
-  createCASDatabases();
+  getOrCreateCASDatabases();
 };
 
 } // end namespace clang
