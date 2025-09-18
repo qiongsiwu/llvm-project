@@ -296,7 +296,8 @@ std::optional<int> CompileJobCache::initialize(CompilerInstance &Clang) {
   if (!CacheCompileJob)
     return std::nullopt;
 
-  std::tie(CAS, Cache) = Clang.createCASDatabases();
+  CAS = Clang.getObjectStorePtr();
+  Cache = Clang.getActionCachePtr();
   if (!CAS || !Cache)
     return 1; // Exit with error!
 

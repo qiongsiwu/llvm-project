@@ -530,6 +530,12 @@ public:
   /// Get the CAS, or create it using the configuration in CompilerInvocation.
   llvm::cas::ObjectStore &getOrCreateObjectStore();
   llvm::cas::ActionCache &getOrCreateActionCache();
+  std::shared_ptr<llvm::cas::ObjectStore> getObjectStorePtr() const {
+    return CAS;
+  }
+  std::shared_ptr<llvm::cas::ActionCache> getActionCachePtr() const {
+    return ActionCache;
+  }
 
   /// @}
   /// @name Source Manager

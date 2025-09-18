@@ -296,6 +296,10 @@ void CompilerInstance::createVirtualFileSystem(
   DiagnosticsEngine Diags(DiagnosticIDs::create(), DiagOpts, DC,
                           /*ShouldOwnClient=*/false);
 
+  std::tie(CAS, ActionCache) =
+      getInvocation().getCASOpts().getOrCreateDatabases(
+          Diags, /*CreateEmptyCASOnFailure=*/false);
+
   VFS = createVFSFromCompilerInvocation(getInvocation(), Diags,
                                         std::move(BaseFS), CAS);
   // FIXME: Should this go into createVFSFromCompilerInvocation?
