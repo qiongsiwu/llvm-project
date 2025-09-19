@@ -1905,6 +1905,12 @@ DEF_TRAVERSE_DECL(OMPThreadPrivateDecl, {
   }
 })
 
+DEF_TRAVERSE_DECL(OMPGroupPrivateDecl, {
+  for (auto *I : D->varlist()) {
+    TRY_TO(TraverseStmt(I));
+  }
+})
+
 DEF_TRAVERSE_DECL(OMPRequiresDecl, {
   for (auto *C : D->clauselists()) {
     TRY_TO(TraverseOMPClause(C));
