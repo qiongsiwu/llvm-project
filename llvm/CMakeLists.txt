@@ -883,12 +883,6 @@ option (LLVM_ENABLE_OCAMLDOC "Build OCaml bindings documentation." ON)
 option (LLVM_ENABLE_BINDINGS "Build bindings." ON)
 option (LLVM_ENABLE_TELEMETRY "Enable the telemetry library. If set to OFF, library cannot be enabled after build (eg., at runtime)" ON)
 
-set(LLVM_ENABLE_ONDISK_CAS_default ON)
-if("${CMAKE_SYSTEM_NAME}" MATCHES SunOS)
-  # Build OnDiskCAS by default only on non-Solaris machines.
-  set(LLVM_ENABLE_ONDISK_CAS_default OFF)
-endif()
-option(LLVM_ENABLE_ONDISK_CAS "Build OnDiskCAS." ${LLVM_ENABLE_ONDISK_CAS_default})
 option(LLVM_CAS_ENABLE_REMOTE_CACHE "Build remote CAS service" OFF)
 if(LLVM_CAS_ENABLE_REMOTE_CACHE)
   include(FindGRPC)
