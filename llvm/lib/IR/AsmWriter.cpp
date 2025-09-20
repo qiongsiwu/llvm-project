@@ -1081,6 +1081,7 @@ void SlotTracker::processModule() {
   for (const GlobalIFunc &I : TheModule->ifuncs()) {
     if (!I.hasName())
       CreateModuleSlot(&I);
+    processGlobalObjectMetadata(I);
   }
 
   // Add metadata used by named metadata.
@@ -4079,6 +4080,11 @@ void AssemblyWriter::printIFunc(const GlobalIFunc *GI) {
     Out << ", partition \"";
     printEscapedString(GI->getPartition(), Out);
     Out << '"';
+  }
+  SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
+  GI->getAllMetadata(MDs);
+  if (!MDs.empty()) {
+    printMetadataAttachments(MDs, ", ");
   }
 
   printInfoComment(*GI);
