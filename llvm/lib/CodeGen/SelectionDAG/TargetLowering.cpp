@@ -1332,8 +1332,7 @@ bool TargetLowering::SimplifyDemandedBits(
                              Depth + 1))
       return true;
 
-    Known.Zero.setAllBits();
-    Known.One.setAllBits();
+    Known.setAllConflict();
     if (!!DemandedSubElts)
       Known = Known.intersectWith(KnownSub);
     if (!!DemandedSrcElts)
@@ -1386,8 +1385,7 @@ bool TargetLowering::SimplifyDemandedBits(
   case ISD::CONCAT_VECTORS: {
     if (VT.isScalableVector())
       return false;
-    Known.Zero.setAllBits();
-    Known.One.setAllBits();
+    Known.setAllConflict();
     EVT SubVT = Op.getOperand(0).getValueType();
     unsigned NumSubVecs = Op.getNumOperands();
     unsigned NumSubElts = SubVT.getVectorNumElements();
@@ -1417,8 +1415,7 @@ bool TargetLowering::SimplifyDemandedBits(
       SDValue Op0 = Op.getOperand(0);
       SDValue Op1 = Op.getOperand(1);
 
-      Known.Zero.setAllBits();
-      Known.One.setAllBits();
+      Known.setAllConflict();
       if (!!DemandedLHS) {
         if (SimplifyDemandedBits(Op0, DemandedBits, DemandedLHS, Known2, TLO,
                                  Depth + 1))
