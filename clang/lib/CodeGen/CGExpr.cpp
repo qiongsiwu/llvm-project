@@ -2230,6 +2230,8 @@ LValue CodeGenFunction::EmitLValueHelper(const Expr *E,
     return EmitAssumptionExprLValue(cast<AssumptionExpr>(E));
   case Expr::ForgePtrExprClass:
     return EmitForgePtrExprLValue(cast<ForgePtrExpr>(E));
+  case Expr::TerminatedByToIndexableExprClass:
+    return EmitTerminatedByToIndexableExprLValue(cast<TerminatedByToIndexableExpr>(E));
   case Expr::BoundsSafetyPointerPromotionExprClass:
     return EmitBoundsSafetyPointerPromotionExprLValue(
         cast<BoundsSafetyPointerPromotionExpr>(E));
@@ -7189,14 +7191,8 @@ LValue CodeGenFunction::EmitMaterializeSequenceExprLValue(
                                            const MaterializeSequenceExpr *MSE) {
   if (MSE->isBinding()) {
     for (auto *OVE : MSE->opaquevalues()) {
-      if (CodeGenFunction::OpaqueValueMappingData::shouldBindAsLValue(OVE)) {
-        RValue PtrRV = EmitAnyExpr(OVE->getSourceExpr());
-        LValue LV = MakeAddrLValue(PtrRV.getAggregateAddress(), OVE->getType());
-        CodeGenFunction::OpaqueValueMappingData::bind(*this, OVE, LV);
-      } else {
-        CodeGenFunction::OpaqueValueMappingData::bind(
-            *this, OVE, OVE->getSourceExpr());
-      }
+      CodeGenFunction::OpaqueValueMappingData::bind(
+          *this, OVE, OVE->getSourceExpr());
     }
   }
 
@@ -7218,6 +7214,10 @@ LValue CodeGenFunction::EmitBoundsSafetyPointerPromotionExprLValue(
 LValue CodeGenFunction::EmitForgePtrExprLValue(const ForgePtrExpr *E) {
   if (!E->getType()->isPointerTypeWithBounds())
     return EmitUnsupportedLValue(E, "l-value expression");
+  return EmitAggExprToLValue(E);
+}
+
+LValue CodeGenFunction::EmitTerminatedByToIndexableExprLValue(const TerminatedByToIndexableExpr *E) {
   return EmitAggExprToLValue(E);
 }
 
