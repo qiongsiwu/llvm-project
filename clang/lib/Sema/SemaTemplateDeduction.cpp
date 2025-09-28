@@ -5329,7 +5329,7 @@ Sema::DeduceAutoType(TypeLoc Type, Expr *Init, QualType &Result,
     // TO_UPSTREAM(BoundsSafety) ON
     if (!CheckAutoCanInferTypeFromBoundsAttributed(*this, AT, Init,
                                                    DeducedType))
-      return DeductionFailed(TemplateDeductionResult::AlreadyDiagnosed);
+      return TemplateDeductionResult::AlreadyDiagnosed;
     // TO_UPSTREAM(BoundsSafety) OFF
   } else {
     LocalInstantiationScope InstScope(*this);
@@ -5403,7 +5403,7 @@ Sema::DeduceAutoType(TypeLoc Type, Expr *Init, QualType &Result,
     // TO_UPSTREAM(BoundsSafety) ON
     if (!CheckAutoCanInferTypeFromBoundsAttributed(*this, AT, Init,
                                                    DeducedType))
-      return DeductionFailed(TemplateDeductionResult::AlreadyDiagnosed);
+      return TemplateDeductionResult::AlreadyDiagnosed;
     // TO_UPSTREAM(BoundsSafety) OFF
 
     if (InitList) {
