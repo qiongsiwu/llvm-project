@@ -13860,8 +13860,6 @@ public:
     Sema &SemaRef;
     bool Invalid;
     bool AlreadyInstantiating;
-    bool CheckInstantiationDepth(SourceLocation PointOfInstantiation,
-                                 SourceRange InstantiationRange);
 
     InstantiatingTemplate(Sema &SemaRef,
                           CodeSynthesisContext::SynthesisKind Kind,
@@ -14054,7 +14052,7 @@ public:
     ~ArgPackSubstIndexRAII() { Self.ArgPackSubstIndex = OldSubstIndex; }
   };
 
-  void pushCodeSynthesisContext(CodeSynthesisContext Ctx);
+  bool pushCodeSynthesisContext(CodeSynthesisContext Ctx);
   void popCodeSynthesisContext();
 
   void PrintContextStack(InstantiationContextDiagFuncRef DiagFunc) {
