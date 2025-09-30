@@ -1514,7 +1514,7 @@ def Constructor : InheritableAttr {
   let TemplateDependent = 1;
   let Documentation = [CtorDtorDocs];
   let AdditionalMembers = [{
-    static constexpr unsigned DefaultPriority = 65535; 
+    static constexpr unsigned DefaultPriority = 65535;
   }];
 }
 
@@ -1859,7 +1859,7 @@ def Destructor : InheritableAttr {
   let TemplateDependent = 1;
   let Documentation = [CtorDtorDocs];
   let AdditionalMembers = [{
-    static constexpr unsigned int DefaultPriority = 65535; 
+    static constexpr unsigned int DefaultPriority = 65535;
   }];
 }
 
