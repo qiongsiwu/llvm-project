@@ -151,6 +151,8 @@
 
 using namespace llvm;
 
+namespace llvm {
+
 static cl::opt<InliningAdvisorMode> UseInlineAdvisor(
     "enable-ml-inliner", cl::init(InliningAdvisorMode::Default), cl::Hidden,
     cl::desc("Enable ML policy for inliner. Currently trained for -Oz only"),
@@ -313,7 +315,6 @@ static cl::opt<std::string> InstrumentColdFuncOnlyPath(
 extern cl::opt<std::string> UseCtxProfile;
 extern cl::opt<bool> PGOInstrumentColdFunctionOnly;
 
-namespace llvm {
 extern cl::opt<bool> EnableMemProfContextDisambiguation;
 } // namespace llvm
 
