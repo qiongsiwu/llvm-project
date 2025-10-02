@@ -3734,6 +3734,10 @@ public:
                                         ParentContext);
   }
 
+  /// Build a new Objective-C boxed expression.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
   ExprResult RebuildConceptSpecializationExpr(NestedNameSpecifierLoc NNS,
       SourceLocation TemplateKWLoc, DeclarationNameInfo ConceptNameInfo,
       NamedDecl *FoundDecl, ConceptDecl *NamedConcept,
@@ -5171,13 +5175,9 @@ bool TreeTransform<Derived>::TransformTemplateArguments(
       typedef TemplateArgumentLocInventIterator<Derived,
                                                 TemplateArgument::pack_iterator>
         PackLocIterator;
-
-      TemplateArgumentListInfo *PackOutput = &Outputs;
-      TemplateArgumentListInfo New;
-
       if (TransformTemplateArguments(
               PackLocIterator(*this, In.getArgument().pack_begin()),
-              PackLocIterator(*this, In.getArgument().pack_end()), *PackOutput,
+              PackLocIterator(*this, In.getArgument().pack_end()), Outputs,
               Uneval))
         return true;
 
@@ -5244,6 +5244,7 @@ bool TreeTransform<Derived>::TransformTemplateArguments(
   }
 
   return false;
+
 }
 
 // FIXME: Find ways to reduce code duplication for pack expansions.
@@ -6312,7 +6313,7 @@ ParmVarDecl *TreeTransform<Derived>::TransformFunctionTypeParam(
                                              /* DefArg */ nullptr);
   newParm->setScopeInfo(OldParm->getFunctionScopeDepth(),
                         OldParm->getFunctionScopeIndex() + indexAdjustment);
-  getDerived().transformedLocalDecl(OldParm, {newParm});
+  transformedLocalDecl(OldParm, {newParm});
   return newParm;
 }
 
@@ -7147,11 +7148,11 @@ QualType TreeTransform<Derived>::TransformUnaryTransformType(
                                                             TypeLocBuilder &TLB,
                                                      UnaryTransformTypeLoc TL) {
   QualType Result = TL.getType();
-  TypeSourceInfo *NewBaseTSI = TL.getUnderlyingTInfo();
   if (Result->isDependentType()) {
     const UnaryTransformType *T = TL.getTypePtr();
 
-    NewBaseTSI = getDerived().TransformType(TL.getUnderlyingTInfo());
+    TypeSourceInfo *NewBaseTSI =
+        getDerived().TransformType(TL.getUnderlyingTInfo());
     if (!NewBaseTSI)
       return QualType();
     QualType NewBase = NewBaseTSI->getType();
@@ -7166,7 +7167,7 @@ QualType TreeTransform<Derived>::TransformUnaryTransformType(
   UnaryTransformTypeLoc NewTL = TLB.push<UnaryTransformTypeLoc>(Result);
   NewTL.setKWLoc(TL.getKWLoc());
   NewTL.setParensRange(TL.getParensRange());
-  NewTL.setUnderlyingTInfo(NewBaseTSI);
+  NewTL.setUnderlyingTInfo(TL.getUnderlyingTInfo());
   return Result;
 }
 
