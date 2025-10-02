@@ -13,6 +13,7 @@
 #include "DWARFDebugInfoEntry.h"
 #include "DWARFDeclContext.h"
 #include "DWARFUnit.h"
+#include "LogChannelDWARF.h"
 #ifdef LLDB_ENABLE_SWIFT
 #include "Plugins/TypeSystem/Swift/TypeSystemSwiftTypeRef.h"
 #endif
