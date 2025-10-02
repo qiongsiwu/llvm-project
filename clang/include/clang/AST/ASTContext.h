@@ -4022,7 +4022,6 @@ typename clang::LazyGenerationalUpdatePtr<Owner, T, Update>::ValueType
     return new (Ctx) LazyData(Source, Value);
   return Value;
 }
-
 template <> struct llvm::DenseMapInfo<llvm::FoldingSetNodeID> {
   static FoldingSetNodeID getEmptyKey() { return FoldingSetNodeID{}; }
 
