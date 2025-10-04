@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+// Flakey, see https://github.com/llvm/llvm-project/issues/152677.
 #ifndef _WIN32 // DISABLE TEST ON WINDOWS
 #include "ProtocolMCPTestUtilities.h" // IWYU pragma: keep
 #include "TestingSupport/Host/JSONTransportTestUtilities.h"
