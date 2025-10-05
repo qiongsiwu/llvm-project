@@ -6787,6 +6787,10 @@ struct MarkUsedTemplateParameterVisitor : DynamicRecursiveASTVisitor {
     }
     return true;
   }
+
+  bool TraverseSizeOfPackExpr(SizeOfPackExpr *SOPE) override {
+    return TraverseDecl(SOPE->getPack());
+  }
 };
 }
 
