@@ -1037,6 +1037,16 @@ TypeSystemSwiftTypeRef::ResolveTypeAlias(swift::Demangle::Demangler &dem,
   };
 
   TypeResults results;
+
+
+  std::vector<CompilerContext> decl_context;
+  BuildDeclContext(node, decl_context);
+  if (decl_context.size() &&
+      decl_context[0].kind == CompilerContextKind::Module &&
+      decl_context[0].name.GetStringRef().starts_with("__lldb"))
+    decl_context.erase(decl_context.begin());
+
+  //  TypeQuery query(decl_context, TypeQueryOptions::e_find_one);
   TypeQuery query(mangled.GetStringRef(), TypeQueryOptions::e_find_one);
   if (!prefer_clang_types) {
     // First check if this type has already been parsed from DWARF.
@@ -1056,7 +1066,6 @@ TypeSystemSwiftTypeRef::ResolveTypeAlias(swift::Demangle::Demangler &dem,
                         "Could not resolve type alias {0}: {1}",
                         mangled.AsCString());
       }
-
       // Do an even more expensive global search.
       target_sp->GetImages().FindTypes(/*search_first=*/nullptr, query,
                                        results);
