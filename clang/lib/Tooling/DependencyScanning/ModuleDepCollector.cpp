@@ -278,6 +278,12 @@ makeCommonInvocationForModuleBuild(CompilerInvocation CI) {
   CI.getFrontendOpts().OutputFile = "-";
   // FIXME: a build system may want to provide a new path.
   CI.getFrontendOpts().IndexUnitOutputPath.clear();
+
+  CI.getFrontendOpts().GenReducedBMI = false;
+  CI.getFrontendOpts().ModuleOutputPath.clear();
+  CI.getHeaderSearchOpts().ModulesSkipHeaderSearchPaths = false;
+  CI.getHeaderSearchOpts().ModulesSkipDiagnosticOptions = false;
+
   // LLVM options are not going to affect the AST
   CI.getFrontendOpts().LLVMArgs.clear();
 
