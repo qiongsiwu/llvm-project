@@ -3421,9 +3421,6 @@ public:
   SanitizerAnnotateDebugInfo(ArrayRef<SanitizerKind::SanitizerOrdinal> Ordinals,
                              SanitizerHandler Handler);
 
-  /// Emit additional metadata used by the AllocToken instrumentation.
-  void EmitAllocToken(llvm::CallBase *CB, QualType AllocType);
-
   llvm::Value *GetCountedByFieldExprGEP(const Expr *Base, const FieldDecl *FD,
                                         const FieldDecl *CountDecl);
 
