@@ -319,6 +319,8 @@ public:
   }
 
   void setStackSizeSVE(uint64_t ZPR, uint64_t PPR) {
+    assert(isAligned(Align(16), ZPR) && isAligned(Align(16), PPR) &&
+           "expected SVE stack sizes to be aligned to 16-bytes");
     StackSizeZPR = ZPR;
     StackSizePPR = PPR;
     HasCalculatedStackSizeSVE = true;
@@ -429,6 +431,8 @@ public:
 
   // Saves the CalleeSavedStackSize for SVE vectors in 'scalable bytes'
   void setSVECalleeSavedStackSize(unsigned ZPR, unsigned PPR) {
+    assert(isAligned(Align(16), ZPR) && isAligned(Align(16), PPR) &&
+           "expected SVE callee-save sizes to be aligned to 16-bytes");
     ZPRCalleeSavedStackSize = ZPR;
     PPRCalleeSavedStackSize = PPR;
     HasSVECalleeSavedStackSize = true;
