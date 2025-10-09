@@ -1,8 +1,8 @@
 {
   "files": [
-    "/json-with-pch.c.tmp.h.pch",
+    "/head.h.pch",
     "/Inputs/head.h",
-    "/json-with-pch.c.tmp.o",
+    "/head.o",
     "/json-with-pch.c"
   ],
   "symbols": [
@@ -50,13 +50,13 @@
       "occurrences": [
         {
           "symbol": 2,
-          "line": 8,
+          "line": 1,
           "col": 5,
           "roles": "Def"
         },
         {
           "symbol": 0,
-          "line": 9,
+          "line": 2,
           "col": 3,
           "roles": "Ref,Call,RelCall,RelCont",
           "relations": [
