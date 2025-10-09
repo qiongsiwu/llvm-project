@@ -1,12 +1,12 @@
 {
   "files": [
-    "/json-with-module.m.tmp.mcp/ModDep.pcm",
-    "/json-with-module.m.tmp.mcp/ModTop.pcm",
+    "/mcp/ModDep.pcm",
+    "/mcp/ModTop.pcm",
     "/Inputs/module/ModDep.h",
     "/Inputs/module/ModTop.h",
     "/Inputs/module/ModTopSub1.h",
     "/Inputs/module/ModTopSub2.h",
-    "/json-with-module.m.tmp.o",
+    "/json.o",
     "/json-with-module.m",
     "/Inputs/module/module.modulemap"
   ],
