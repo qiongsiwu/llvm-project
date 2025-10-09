@@ -434,8 +434,7 @@ bool ThreadPlanStepOut::ShouldStop(Event *event_ptr) {
     if (m_step_out_further_plan_sp->MischiefManaged()) {
       m_step_out_further_plan_sp.reset();
       done = true;
-    }
-    else
+    } else
       return m_step_out_further_plan_sp->ShouldStop(event_ptr);
   }
 
