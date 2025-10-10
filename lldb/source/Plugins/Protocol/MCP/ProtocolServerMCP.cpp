@@ -145,6 +145,7 @@ llvm::Error ProtocolServerMCP::Stop() {
 
   m_server.reset(nullptr);
   m_server_info_handle.Remove();
+  m_listener.reset();
 
   return llvm::Error::success();
 }
