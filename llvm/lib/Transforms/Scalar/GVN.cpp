@@ -137,9 +137,7 @@ static cl::opt<uint32_t> MaxNumInsnsPerBlock(
     cl::desc("Max number of instructions to scan in each basic block in GVN "
              "(default = 100)"));
 
-namespace llvm {
-
-template <> struct DenseMapInfo<GVNPass::Expression> {
+template <> struct llvm::DenseMapInfo<GVNPass::Expression> {
   static inline GVNPass::Expression getEmptyKey() { return ~0U; }
   static inline GVNPass::Expression getTombstoneKey() { return ~1U; }
 
@@ -154,8 +152,6 @@ template <> struct DenseMapInfo<GVNPass::Expression> {
     return LHS == RHS;
   }
 };
-
-} // end namespace llvm
 
 //===----------------------------------------------------------------------===//
 //                     ValueTable Internal Functions
