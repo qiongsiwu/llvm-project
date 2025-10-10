@@ -1679,7 +1679,6 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
     if (Record.size() < 16 || Record.size() > 26)
       return error("Invalid record");
 
-    IsDistinct = Record[0] & 1;
     // If we have a UUID and this is not a forward declaration, lookup the
     // mapping.
     IsDistinct = Record[0] & 0x1;

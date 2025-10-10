@@ -601,6 +601,7 @@ std::error_code resize_file(int FD, uint64_t Size) {
 }
 
 std::error_code resize_file_sparse(int FD, uint64_t Size) {
+  // On Unix, this is the same as `resize_file`.
   return resize_file(FD, Size);
 }
 
