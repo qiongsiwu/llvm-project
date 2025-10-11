@@ -278,6 +278,7 @@ public:
     MuslF32,
     MuslSF,
     MuslX32,
+    MuslWALI,
     LLVM,
 
     MSVC,
@@ -799,6 +800,12 @@ public:
     return getObjectFormat() == Triple::DXContainer;
   }
 
+  /// Tests whether the target uses WALI Wasm
+  bool isWALI() const {
+    return getArch() == Triple::wasm32 && isOSLinux() &&
+           getEnvironment() == Triple::MuslWALI;
+  }
+
   /// Tests whether the target is the PS4 platform.
   bool isPS4() const {
     return getArch() == Triple::x86_64 &&
@@ -841,6 +848,7 @@ public:
            getEnvironment() == Triple::MuslF32 ||
            getEnvironment() == Triple::MuslSF ||
            getEnvironment() == Triple::MuslX32 ||
+           getEnvironment() == Triple::MuslWALI ||
            getEnvironment() == Triple::OpenHOS || isOSLiteOS();
   }
 
