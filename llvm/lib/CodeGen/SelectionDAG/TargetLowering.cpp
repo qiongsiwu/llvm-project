@@ -7677,7 +7677,6 @@ SDValue TargetLowering::getNegatedExpression(SDValue Op, SelectionDAG &DAG,
     break;
   }
   case ISD::FMA:
-  case ISD::FMULADD:
   case ISD::FMAD: {
     if (!Flags.hasNoSignedZeros())
       break;
