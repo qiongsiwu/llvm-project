@@ -20,7 +20,7 @@
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetMachine.h"
 
-namespace llvm {
+using namespace llvm;
 
 AIXException::AIXException(AsmPrinter *A) : DwarfCFIExceptionBase(A) {}
 
@@ -99,5 +99,3 @@ void AIXException::endFunction(const MachineFunction *MF) {
 
   emitExceptionInfoTable(LSDALabel, PerSym);
 }
-
-} // End of namespace llvm
