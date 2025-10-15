@@ -3834,7 +3834,7 @@ static bool ShouldUseExternalRTTIDescriptor(CodeGenModule &CGM,
 
   if (const RecordType *RecordTy = dyn_cast<RecordType>(Ty)) {
     const CXXRecordDecl *RD =
-        cast<CXXRecordDecl>(RecordTy->getOriginalDecl())->getDefinitionOrSelf();
+        cast<CXXRecordDecl>(RecordTy->getDecl())->getDefinitionOrSelf();
     if (!RD->hasDefinition())
       return false;
 
@@ -3868,9 +3868,7 @@ static bool ShouldUseExternalRTTIDescriptor(CodeGenModule &CGM,
 
 /// IsIncompleteClassType - Returns whether the given record type is incomplete.
 static bool IsIncompleteClassType(const RecordType *RecordTy) {
-  return !RecordTy->getOriginalDecl()
-              ->getDefinitionOrSelf()
-              ->isCompleteDefinition();
+  return !RecordTy->getDecl()->getDefinitionOrSelf()->isCompleteDefinition();
 }
 
 /// ContainsIncompleteClassType - Returns whether the given type contains an
@@ -4003,9 +4001,8 @@ void ItaniumRTTIBuilder::BuildVTablePointer(const Type *Ty,
     break;
 
   case Type::Record: {
-    const CXXRecordDecl *RD =
-        cast<CXXRecordDecl>(cast<RecordType>(Ty)->getOriginalDecl())
-            ->getDefinitionOrSelf();
+    const auto *RD = cast<CXXRecordDecl>(cast<RecordType>(Ty)->getDecl())
+                         ->getDefinitionOrSelf();
 
     if (!RD->hasDefinition() || !RD->getNumBases()) {
       VTableName = ClassTypeInfo;
@@ -4127,8 +4124,8 @@ static llvm::GlobalVariable::LinkageTypes getTypeInfoLinkage(CodeGenModule &CGM,
       return llvm::GlobalValue::LinkOnceODRLinkage;
 
     if (const RecordType *Record = dyn_cast<RecordType>(Ty)) {
-      const CXXRecordDecl *RD =
-          cast<CXXRecordDecl>(Record->getOriginalDecl())->getDefinitionOrSelf();
+      const auto *RD =
+          cast<CXXRecordDecl>(Record->getDecl())->getDefinitionOrSelf();
       if (RD->hasAttr<WeakAttr>())
         return llvm::GlobalValue::WeakODRLinkage;
       if (CGM.getTriple().isWindowsItaniumEnvironment())
@@ -4291,9 +4288,8 @@ llvm::Constant *ItaniumRTTIBuilder::BuildTypeInfo(
     break;
 
   case Type::Record: {
-    const CXXRecordDecl *RD =
-        cast<CXXRecordDecl>(cast<RecordType>(Ty)->getOriginalDecl())
-            ->getDefinitionOrSelf();
+    const auto *RD = cast<CXXRecordDecl>(cast<RecordType>(Ty)->getDecl())
+                         ->getDefinitionOrSelf();
     if (!RD->hasDefinition() || !RD->getNumBases()) {
       // We don't need to emit any fields.
       break;
@@ -4340,8 +4336,8 @@ llvm::Constant *ItaniumRTTIBuilder::BuildTypeInfo(
   if (CGM.getTarget().hasPS4DLLImportExport() &&
       GVDLLStorageClass != llvm::GlobalVariable::DLLExportStorageClass) {
     if (const RecordType *RecordTy = dyn_cast<RecordType>(Ty)) {
-      const CXXRecordDecl *RD = cast<CXXRecordDecl>(RecordTy->getOriginalDecl())
-                                    ->getDefinitionOrSelf();
+      const auto *RD =
+          cast<CXXRecordDecl>(RecordTy->getDecl())->getDefinitionOrSelf();
       if (RD->hasAttr<DLLExportAttr>() ||
           CXXRecordNonInlineHasAttr<DLLExportAttr>(RD))
         GVDLLStorageClass = llvm::GlobalVariable::DLLExportStorageClass;

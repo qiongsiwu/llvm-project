@@ -4251,8 +4251,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       }
 
       // Next subobject is a class, struct or union field.
-      RecordDecl *RD =
-          ObjType->castAsCanonical<RecordType>()->getOriginalDecl();
+      RecordDecl *RD = ObjType->castAsCanonical<RecordType>()->getDecl();
       if (RD->isUnion()) {
         const FieldDecl *UnionField = O->getUnionField();
         if (!UnionField ||
@@ -7987,7 +7986,7 @@ class BufferToAPValueConverter {
 
   std::optional<APValue> visit(const EnumType *Ty, CharUnits Offset) {
     QualType RepresentationType =
-        Ty->getOriginalDecl()->getDefinitionOrSelf()->getIntegerType();
+        Ty->getDecl()->getDefinitionOrSelf()->getIntegerType();
     assert(!RepresentationType.isNull() &&
            "enum forward decl should be caught by Sema");
     const auto *AsBuiltin =
@@ -8815,7 +8814,7 @@ public:
     const FieldDecl *FD = dyn_cast<FieldDecl>(E->getMemberDecl());
     if (!FD) return Error(E);
     assert(!FD->getType()->isReferenceType() && "prvalue reference?");
-    assert(BaseTy->castAsCanonical<RecordType>()->getOriginalDecl() ==
+    assert(BaseTy->castAsCanonical<RecordType>()->getDecl() ==
                FD->getParent()->getCanonicalDecl() &&
            "record / field mismatch");
 
@@ -9044,7 +9043,7 @@ public:
 
     const ValueDecl *MD = E->getMemberDecl();
     if (const FieldDecl *FD = dyn_cast<FieldDecl>(E->getMemberDecl())) {
-      assert(BaseTy->castAsCanonical<RecordType>()->getOriginalDecl() ==
+      assert(BaseTy->castAsCanonical<RecordType>()->getDecl() ==
                  FD->getParent()->getCanonicalDecl() &&
              "record / field mismatch");
       (void)BaseTy;
