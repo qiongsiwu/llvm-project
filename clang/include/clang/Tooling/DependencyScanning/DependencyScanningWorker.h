@@ -13,6 +13,7 @@
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Frontend/PCHContainerOperations.h"
+#include "clang/Tooling/DependencyScanning/DependencyScannerImpl.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -199,6 +200,34 @@ public:
   /// each invocation.
   llvm::IntrusiveRefCntPtr<FileManager> getOrCreateFileManager() const;
 
+  /// The three method below implements a new interface for by name
+  /// dependency scanning. They together enable the dependency scanning worker
+  /// to more effectively perform scanning for a sequence of modules
+  /// by name when the CWD and CommandLine do not change across the queries.
+
+  /// @brief Initializing the context and the compiler instance.
+  /// @param CWD The current working directory used during the scan.
+  /// @param CommandLine The commandline used for the scan.
+  /// @return Error if the initializaiton fails.
+  llvm::Error initializeCompierInstanceWithContext(
+      StringRef CWD, const std::vector<std::string> &CommandLine);
+
+  /// @brief Performaces dependency scanning for the module whose name is
+  ///        specified.
+  /// @param ModuleName  The name of the module whose dependency will be
+  ///                    scanned.
+  /// @param Consumer The dependency consumer that stores the results.
+  /// @param Controller The controller for the dependency scanning action.
+  /// @return Error if the scanner incurs errors.
+  llvm::Error
+  computeDependenciesByNameWithContext(StringRef ModuleName,
+                                       DependencyConsumer &Consumer,
+                                       DependencyActionController &Controller);
+
+  /// @brief Finalizes the diagnostics engine and deletes the compiler instance.
+  /// @return Error if errors occur during finalization.
+  llvm::Error finalizeCompilerInstanceWithContext();
+
   llvm::vfs::FileSystem &getVFS() const { return *BaseFS; }
 
 private:
@@ -220,6 +249,9 @@ private:
   llvm::IntrusiveRefCntPtr<DependencyScanningCASFilesystem> DepCASFS;
   CASOptions CASOpts;
   std::shared_ptr<cas::ObjectStore> CAS;
+
+  friend class CompilerInstanceWithContext;
+  std::unique_ptr<CompilerInstanceWithContext> CIWithContext;
 
   /// Private helper functions.
   bool scanDependencies(StringRef WorkingDirectory,

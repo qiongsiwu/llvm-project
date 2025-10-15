@@ -42,6 +42,7 @@ class DiagnosticsEngine;
 class ExternalSemaSource;
 class FrontendOptions;
 class PCHContainerReader;
+class PPCallbacks;
 class Preprocessor;
 class PreprocessorOptions;
 class PreprocessorOutputOptions;
@@ -89,6 +90,9 @@ public:
                                   bool IsSystem, bool IsModuleFile,
                                   bool IsMissing);
 
+  /// @return the PPCallback this collector added to the Preprocessor.
+  virtual PPCallbacks *getPPCallbacks() { return nullptr; };
+
 protected:
   /// Return true if the filename was added to the list of dependencies, false
   /// otherwise.
@@ -120,6 +124,11 @@ public:
 
   bool sawDependency(StringRef Filename, bool FromModule, bool IsSystem,
                      bool IsModuleFile, bool IsMissing) final;
+
+  PPCallbacks *getPPCallbacks() override {
+    assert(0 && "DependencyFileGenerator");
+    return nullptr; // CollectorPPPtr;
+  }
 
 protected:
   void outputDependencyFile(llvm::raw_ostream &OS);
@@ -167,6 +176,11 @@ public:
 
   void attachToPreprocessor(Preprocessor &PP) override;
   void attachToASTReader(ASTReader &R) override;
+
+  PPCallbacks *getPPCallbacks() override {
+    assert(0 && "ModuleDependencyCollector");
+    return nullptr; // CollectorPPPtr;
+  }
 
   virtual void writeFileMap();
   virtual bool hasErrors() { return HasErrors; }

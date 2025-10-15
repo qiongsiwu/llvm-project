@@ -72,6 +72,11 @@ public:
   // spuriously added by '-isystem' (e.g. to suppress warnings from those
   // headers).
   bool needSystemDependencies() override { return true; }
+
+  PPCallbacks *getPPCallbacks() override {
+    assert(0 && "PreambleDependencyCollector");
+    return nullptr; // CollectorPPPtr;
+  }
 };
 
 // Collects files whose existence would invalidate the preamble.
