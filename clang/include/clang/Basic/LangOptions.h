@@ -798,6 +798,15 @@ public:
     return OpenMPIsTargetDevice || CUDAIsDevice || SYCLIsDevice;
   }
 
+  /// Returns the most applicable C standard-compliant language version code.
+  /// If none could be determined, returns \ref std::nullopt.
+  std::optional<uint32_t> getCLangStd() const;
+
+  /// Returns the most applicable C++ standard-compliant language
+  /// version code.
+  /// If none could be determined, returns \ref std::nullopt.
+  std::optional<uint32_t> getCPlusPlusLangStd() const;
+
   /* TO_UPSTREAM(BoundsSafety) ON */
   // Returns true iff -fbounds-safety is enabled. This is a convenience function
   // that can be called from Xcode disclosed clang without hitting a compilation
