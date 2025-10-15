@@ -242,12 +242,12 @@ static cl::opt<bool>
                   cl::init(false));
 // END MCCAS
 
-namespace {
-
-std::vector<std::string> &getRunPassNames() {
+static std::vector<std::string> &getRunPassNames() {
   static std::vector<std::string> RunPassNames;
   return RunPassNames;
 }
+
+namespace {
 struct RunPassOption {
   void operator=(const std::string &Val) const {
     if (Val.empty())
