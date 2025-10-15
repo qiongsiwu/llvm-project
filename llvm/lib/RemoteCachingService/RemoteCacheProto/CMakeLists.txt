@@ -5,7 +5,7 @@ function(generate_llvm_protos_library LibraryName ProtoFile)
 
   add_llvm_component_library(${LibraryName} ${ProtoSource}
     PARTIAL_SOURCES_INTENDED
-    LINK_LIBS PUBLIC grpc++ gpr protobuf)
+    LINK_LIBS PUBLIC grpc++ protobuf)
 endfunction()
 
 generate_llvm_protos_library(LLVMRemoteCacheKVProto "compilation_caching_kv.proto" GRPC)
