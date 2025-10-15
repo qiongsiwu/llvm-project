@@ -656,6 +656,7 @@ struct AArch64FunctionInfo final : public yaml::MachineFunctionInfo {
   std::optional<uint64_t> StackSizeZPR;
   std::optional<uint64_t> StackSizePPR;
   std::optional<bool> HasStackFrame;
+  std::optional<bool> HasStreamingModeChanges;
 
   AArch64FunctionInfo() = default;
   AArch64FunctionInfo(const llvm::AArch64FunctionInfo &MFI);
@@ -670,6 +671,7 @@ template <> struct MappingTraits<AArch64FunctionInfo> {
     YamlIO.mapOptional("stackSizeZPR", MFI.StackSizeZPR);
     YamlIO.mapOptional("stackSizePPR", MFI.StackSizePPR);
     YamlIO.mapOptional("hasStackFrame", MFI.HasStackFrame);
+    YamlIO.mapOptional("hasStreamingModeChanges", MFI.HasStreamingModeChanges);
   }
 };
 
