@@ -796,8 +796,7 @@ ABIArgInfo X86_32ABIInfo::classifyArgumentType(QualType Ty, CCState &State,
   if (isAggregateTypeForABI(Ty)) {
     // Structures with flexible arrays are always indirect.
     // FIXME: This should not be byval!
-    if (RT &&
-        RT->getOriginalDecl()->getDefinitionOrSelf()->hasFlexibleArrayMember())
+    if (RT && RT->getDecl()->getDefinitionOrSelf()->hasFlexibleArrayMember())
       return getIndirectResult(Ty, true, State);
 
     // Ignore empty structs/unions on non-Windows.
@@ -832,7 +831,7 @@ ABIArgInfo X86_32ABIInfo::classifyArgumentType(QualType Ty, CCState &State,
       unsigned AlignInBits = 0;
       if (RT) {
         const ASTRecordLayout &Layout =
-            getContext().getASTRecordLayout(RT->getOriginalDecl());
+            getContext().getASTRecordLayout(RT->getDecl());
         AlignInBits = getContext().toBits(Layout.getRequiredAlignment());
       } else if (TI.isAlignRequired()) {
         AlignInBits = TI.Align;
@@ -2065,7 +2064,7 @@ void X86_64ABIInfo::classify(QualType Ty, uint64_t OffsetBase, Class &Lo,
     if (getRecordArgABI(RT, getCXXABI()))
       return;
 
-    const RecordDecl *RD = RT->getOriginalDecl()->getDefinitionOrSelf();
+    const RecordDecl *RD = RT->getDecl()->getDefinitionOrSelf();
 
     // Assume variable sized types are passed in memory.
     if (RD->hasFlexibleArrayMember())
@@ -2874,9 +2873,8 @@ ABIArgInfo
 X86_64ABIInfo::classifyRegCallStructTypeImpl(QualType Ty, unsigned &NeededInt,
                                              unsigned &NeededSSE,
                                              unsigned &MaxVectorWidth) const {
-  auto *RD = cast<RecordType>(Ty.getCanonicalType())
-                 ->getOriginalDecl()
-                 ->getDefinitionOrSelf();
+  auto *RD =
+      cast<RecordType>(Ty.getCanonicalType())->getDecl()->getDefinitionOrSelf();
 
   if (RD->hasFlexibleArrayMember())
     return getIndirectReturnResult(Ty);
@@ -3336,7 +3334,7 @@ ABIArgInfo WinX86_64ABIInfo::classify(QualType Ty, unsigned &FreeSSERegs,
                                        RAA == CGCXXABI::RAA_DirectInMemory);
     }
 
-    if (RT->getOriginalDecl()->getDefinitionOrSelf()->hasFlexibleArrayMember())
+    if (RT->getDecl()->getDefinitionOrSelf()->hasFlexibleArrayMember())
       return getNaturalAlignIndirect(Ty, getDataLayout().getAllocaAddrSpace(),
                                      /*ByVal=*/false);
   }
