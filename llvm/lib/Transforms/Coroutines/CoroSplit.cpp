@@ -163,7 +163,7 @@ static void maybeFreeRetconStorage(IRBuilder<> &Builder,
   if (Shape.RetconLowering.IsFrameInlineInStorage)
     return;
 
-  Shape.emitDealloc(Builder, FramePtr, CG);
+  Shape.emitDealloc(Builder, FramePtr, nullptr, CG);
 }
 
 /// Replace an llvm.coro.end.async.
@@ -1909,7 +1909,8 @@ void coro::AnyRetconABI::splitCoroutine(Function &F, coro::Shape &Shape,
     // Allocate.  We don't need to update the call graph node because we're
     // going to recompute it from scratch after splitting.
     // FIXME: pass the required alignment
-    RawFramePtr = Shape.emitAlloc(Builder, Builder.getInt64(Size), nullptr);
+    RawFramePtr =
+        Shape.emitAlloc(Builder, Builder.getInt64(Size), nullptr, nullptr);
     RawFramePtr =
         Builder.CreateBitCast(RawFramePtr, Shape.CoroBegin->getType());
 
