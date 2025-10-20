@@ -605,20 +605,18 @@ public:
         m_synth_backend_up()
 #define COMPONENT(Name, PrettyName, ID) , m_##Name(nullptr)
 #include "URLComponents.def"
-  {
-    SetValid(false);
-  }
+  {}
 
   ~URLComponentsSyntheticChildrenFrontEnd() override = default;
 
   llvm::Expected<uint32_t> CalculateNumChildren() override {
-    if (IsValid())
+    if (m_valid)
       return 9;
     return 0;
   }
 
   lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override {
-    if (IsValid()) {
+    if (m_valid) {
       switch (idx) {
 #define COMPONENT(Name, PrettyName, ID)                                        \
   case ID:                                                                     \
@@ -646,7 +644,7 @@ public:
 #define COMPONENT(Name, PrettyName, ID) m_##Name = nullptr;
 #include "URLComponents.def"
 
-    SetValid(false);
+    m_valid = false;
 
     ValueObjectSP underlying_sp =
         m_backend.GetChildAtNamePath({g__handle, g__pointer});
@@ -686,7 +684,7 @@ public:
     m_##Name->SetName(GetNameFor##Name());
 #include "URLComponents.def"
 
-    SetValid(CheckValid());
+    m_valid = CheckValid();
 
     return ChildCacheState::eRefetch;
   }
@@ -712,6 +710,7 @@ private:
 
   SyntheticChildrenFrontEnd::AutoPointer m_synth_frontend_up;
   std::unique_ptr<ObjCRuntimeSyntheticProvider> m_synth_backend_up;
+  bool m_valid = false;
 #define COMPONENT(Name, PrettyName, ID) ValueObject *m_##Name;
 #include "URLComponents.def"
 
