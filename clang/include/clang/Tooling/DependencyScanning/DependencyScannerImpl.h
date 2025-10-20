@@ -194,7 +194,7 @@ class CompilerInstanceWithContext {
 
   // Context - stable directory handling
   llvm::SmallVector<StringRef> StableDirs;
-  PrebuiltModulesAttrsMap PrebuiltModuleVFSMap;
+  PrebuiltModulesAttrsMap PrebuiltModuleASTMap;
 
   // Compiler Instance
   std::unique_ptr<CompilerInstance> CIPtr;
