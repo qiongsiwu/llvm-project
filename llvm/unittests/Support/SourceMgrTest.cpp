@@ -523,7 +523,7 @@ TEST_F(SourceMgrTest, AddIncludedFile) {
                                MemoryBufferRef(IncludesContent, IncludesPath)));
 
   // Set up SM.
-  SM.setFileSystem(FS);
+  SM.setVirtualFileSystem(FS);
   SM.setIncludeDirs({Includes.str()});
 
   setMainBuffer("include-top\n", "file.in");
