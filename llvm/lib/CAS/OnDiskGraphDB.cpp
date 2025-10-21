@@ -850,6 +850,7 @@ uint64_t DataRecordHandle::getDataSize() const {
   case DataSizeFlags::Uses8B:
     return support::endian::read64le(DataSizePtr);
   }
+  llvm_unreachable("Unknown DataSizeFlags enum");
 }
 
 void DataRecordHandle::skipDataSize(LayoutFlags LF, int64_t &RelOffset) const {
@@ -877,6 +878,7 @@ uint32_t DataRecordHandle::getNumRefs() const {
   case NumRefsFlags::Uses8B:
     return support::endian::read64le(NumRefsPtr);
   }
+  llvm_unreachable("Unknown NumRefsFlags enum");
 }
 
 void DataRecordHandle::skipNumRefs(LayoutFlags LF, int64_t &RelOffset) const {
@@ -1284,6 +1286,7 @@ Expected<bool> OnDiskGraphDB::isMaterialized(ObjectID Ref) {
       return FaultInResult.takeError();
     return true;
   }
+  llvm_unreachable("Unknown ObjectPresence enum");
 }
 
 Expected<OnDiskGraphDB::ObjectPresence>
