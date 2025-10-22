@@ -119,7 +119,7 @@ private:
 
   // AsmPrinterHandler overrides.
 public:
-  virtual ~DebugHandlerBase() override;
+  ~DebugHandlerBase() override;
 
   void beginModule(Module *M) override;
 
