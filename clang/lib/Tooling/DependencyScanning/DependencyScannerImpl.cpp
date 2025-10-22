@@ -1078,19 +1078,18 @@ llvm::Error CompilerInstanceWithContext::computeDependencies(
       Worker.Service, *Invocation, Controller, PrebuiltModuleASTMap, StableDirs,
       false);
 
+  if (Error E = Controller.initialize(CI, Inv)) {
+    CI.getDiagnostics().Report(diag::err_cas_depscan_failed) << std::move(E);
+    return E;
+  }
+
   if (!SrcLocOffset) {
     // When SrcLocOffset is zero, we are at the beginning of the fake source
     // file. In this case, we call BeginSourceFile to initialize.
     std::unique_ptr<FrontendAction> Action =
         std::make_unique<GetDependenciesByModuleNameAction>(ModuleName);
     auto InputFile = CI.getFrontendOpts().Inputs.begin();
-
     Action->BeginSourceFile(CI, *InputFile);
-  }
-
-  if (Error E = Controller.initialize(CI, Inv)) {
-    CI.getDiagnostics().Report(diag::err_cas_depscan_failed) << std::move(E);
-    return E;
   }
 
   Preprocessor &PP = CI.getPreprocessor();
@@ -1107,7 +1106,6 @@ llvm::Error CompilerInstanceWithContext::computeDependencies(
     // initialized through a previous call of computeDependencies. We want to
     // preserve the PP's state, hence we do not call EnterSourceFile again.
     auto DCs = CI.getDependencyCollectors();
-    size_t Idx = 0;
     for (auto &DC : DCs) {
       DC->attachToPreprocessor(PP);
       auto *CB = DC->getPPCallbacks();
@@ -1117,7 +1115,6 @@ llvm::Error CompilerInstanceWithContext::computeDependencies(
       CB->LexedFileChanged(MainFileID,
                            PPChainedCallbacks::LexedFileChangeReason::EnterFile,
                            FileType, PrevFID, IDLocation);
-      Idx++;
     }
   }
 
@@ -1128,28 +1125,22 @@ llvm::Error CompilerInstanceWithContext::computeDependencies(
   auto ModResult = CI.loadModule(IDLocation, Path, Module::Hidden, false);
 
   auto DCs = CI.getDependencyCollectors();
-  size_t Idx = 0;
   for (auto &DC : DCs) {
     auto *CB = DC->getPPCallbacks();
     if (CB) {
       CB->moduleImport(SourceLocation(), Path, ModResult);
       CB->EndOfMainFile();
     }
-
-    Idx++;
   }
 
   MDC->applyDiscoveredDependencies(Inv);
 
-  // TODO: We should finalize the controller, but we will need to figure out why
-  // we are hitting an assert here.
-  // if (Error E = Controller.finalize(CI, Inv)) {
-  //   CI.getDiagnostics().Report(diag::err_cas_depscan_failed) << std::move(E);
-  //   return E;
-  // }
+  if (Error E = Controller.finalize(CI, Inv)) {
+    CI.getDiagnostics().Report(diag::err_cas_depscan_failed) << std::move(E);
+    return E;
+  }
 
   std::string ID = Inv.getFileSystemOpts().CASFileSystemRootID;
-
   if (!ID.empty())
     Consumer.handleCASFileSystemRootID(std::move(ID));
   ID = Inv.getFrontendOpts().CASIncludeTreeID;
