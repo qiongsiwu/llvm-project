@@ -240,6 +240,8 @@ class HLSLSemanticAttr : public HLSLAnnotationAttr {
   LLVM_PREFERRED_TYPE(bool)
   unsigned SemanticExplicitIndex : 1;
 
+  Decl *TargetDecl = nullptr;
+
 protected:
   HLSLSemanticAttr(ASTContext &Context, const AttributeCommonInfo &CommonInfo,
                    attr::Kind AK, bool IsLateParsed,
@@ -259,6 +261,11 @@ public:
   }
 
   unsigned getSemanticIndex() const { return SemanticIndex; }
+
+  bool isSemanticIndexExplicit() const { return SemanticExplicitIndex; }
+
+  void setTargetDecl(Decl *D) { TargetDecl = D; }
+  Decl *getTargetDecl() const { return TargetDecl; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Attr *A) {
