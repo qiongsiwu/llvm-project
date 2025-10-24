@@ -52,12 +52,12 @@ static bool isSuspendReachableFrom(BasicBlock *From,
 
 /// Is the given alloca "local", i.e. bounded in lifetime to not cross a
 /// suspend point?
-static bool isLocalAlloca(CoroAllocaAllocInst *AI) {
+static bool isLocalAlloca(AnyCoroAllocaAllocInst *AI) {
   // Seed the visited set with all the basic blocks containing a free
   // so that we won't pass them up.
   VisitedBlocksSet VisitedOrFreeBBs;
   for (auto *User : AI->users()) {
-    if (auto FI = dyn_cast<CoroAllocaFreeInst>(User))
+    if (auto FI = dyn_cast<AnyCoroAllocaFreeInst>(User))
       VisitedOrFreeBBs.insert(FI->getParent());
   }
 
@@ -68,18 +68,18 @@ static bool isLocalAlloca(CoroAllocaAllocInst *AI) {
 /// This happens during the all-instructions iteration, so it must not
 /// delete the call.
 static Instruction *
-lowerNonLocalAlloca(CoroAllocaAllocInst *AI, const Shape &Shape,
+lowerNonLocalAlloca(AnyCoroAllocaAllocInst *AI, const Shape &Shape,
                     SmallVectorImpl<Instruction *> &DeadInsts) {
   IRBuilder<> Builder(AI);
-  auto Alloc = Shape.emitAlloc(Builder, AI->getSize(), nullptr);
+  auto Alloc = Shape.emitAlloc(Builder, AI->getSize(), AI, nullptr);
 
   for (User *U : AI->users()) {
     if (isa<CoroAllocaGetInst>(U)) {
       U->replaceAllUsesWith(Alloc);
     } else {
-      auto FI = cast<CoroAllocaFreeInst>(U);
+      auto FI = cast<AnyCoroAllocaFreeInst>(U);
       Builder.SetInsertPoint(FI);
-      Shape.emitDealloc(Builder, Alloc, nullptr);
+      Shape.emitDealloc(Builder, Alloc, AI, nullptr);
     }
     DeadInsts.push_back(cast<Instruction>(U));
   }
@@ -460,7 +460,7 @@ void coro::collectSpillsFromArgs(SpillInfo &Spills, Function &F,
 void coro::collectSpillsAndAllocasFromInsts(
     SpillInfo &Spills, SmallVector<AllocaInfo, 8> &Allocas,
     SmallVector<Instruction *, 4> &DeadInstructions,
-    SmallVector<CoroAllocaAllocInst *, 4> &LocalAllocas, Function &F,
+    SmallVector<AnyCoroAllocaAllocInst *, 4> &LocalAllocas, Function &F,
     const SuspendCrossingInfo &Checker, const DominatorTree &DT,
     const coro::Shape &Shape) {
 
@@ -471,7 +471,7 @@ void coro::collectSpillsAndAllocasFromInsts(
       continue;
 
     // Handle alloca.alloc specially here.
-    if (auto AI = dyn_cast<CoroAllocaAllocInst>(&I)) {
+    if (auto AI = dyn_cast<AnyCoroAllocaAllocInst>(&I)) {
       // Check whether the alloca's lifetime is bounded by suspend points.
       if (isLocalAlloca(AI)) {
         LocalAllocas.push_back(AI);

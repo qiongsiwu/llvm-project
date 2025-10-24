@@ -329,7 +329,9 @@ void coro::Shape::analyze(Function &F,
     auto Prototype = ContinuationId->getPrototype();
     RetconLowering.ResumePrototype = Prototype;
     RetconLowering.Alloc = ContinuationId->getAllocFunction();
+    RetconLowering.AllocFrame = ContinuationId->getAllocFrameFunction();
     RetconLowering.Dealloc = ContinuationId->getDeallocFunction();
+    RetconLowering.DeallocFrame = ContinuationId->getDeallocFrameFunction();
     RetconLowering.Storage = ContinuationId->getStorage();
     RetconLowering.Allocator = ContinuationId->getAllocator();
     RetconLowering.ReturnBlock = nullptr;
@@ -527,7 +529,7 @@ static void addCallToCallGraph(CallGraph *CG, CallInst *Call, Function *Callee){
 }
 
 Value *coro::Shape::emitAlloc(IRBuilder<> &Builder, Value *Size,
-                              CallGraph *CG) const {
+                              AnyCoroAllocaAllocInst *AI, CallGraph *CG) const {
   switch (ABI) {
   case coro::ABI::Switch:
     llvm_unreachable("can't allocate memory in coro switch-lowering");
@@ -536,12 +538,21 @@ Value *coro::Shape::emitAlloc(IRBuilder<> &Builder, Value *Size,
   case coro::ABI::RetconOnce:
   case coro::ABI::RetconOnceDynamic: {
     unsigned sizeParamIndex = 0;
+    Function *Alloc = nullptr;
+    if (isa_and_nonnull<CoroAllocaAllocFrameInst>(AI)) {
+      assert(ABI == coro::ABI::RetconOnceDynamic);
+      Alloc = RetconLowering.AllocFrame;
+    } else {
+      Alloc = RetconLowering.Alloc;
+    }
     SmallVector<Value *, 2> Args;
     if (ABI == coro::ABI::RetconOnceDynamic) {
-      sizeParamIndex = 1;
+      Args.push_back(RetconLowering.Storage);
       Args.push_back(RetconLowering.Allocator);
+      sizeParamIndex = 2;
+    } else {
+      Alloc = RetconLowering.Alloc;
     }
-    auto Alloc = RetconLowering.Alloc;
     Size = Builder.CreateIntCast(
         Size, Alloc->getFunctionType()->getParamType(sizeParamIndex),
         /*is signed*/ false);
@@ -552,6 +563,9 @@ Value *coro::Shape::emitAlloc(IRBuilder<> &Builder, Value *Size,
         Args.push_back(TypeId);
     }
     auto *Call = Builder.CreateCall(Alloc, Args);
+    if (ABI == coro::ABI::RetconOnceDynamic) {
+      Call->addParamAttr(1, Attribute::SwiftCoro);
+    }
     propagateCallAttrsFromCallee(Call, Alloc);
     addCallToCallGraph(CG, Call, Alloc);
     return Call;
@@ -563,7 +577,7 @@ Value *coro::Shape::emitAlloc(IRBuilder<> &Builder, Value *Size,
 }
 
 void coro::Shape::emitDealloc(IRBuilder<> &Builder, Value *Ptr,
-                              CallGraph *CG) const {
+                              AnyCoroAllocaAllocInst *AI, CallGraph *CG) const {
   switch (ABI) {
   case coro::ABI::Switch:
     llvm_unreachable("can't allocate memory in coro switch-lowering");
@@ -571,17 +585,29 @@ void coro::Shape::emitDealloc(IRBuilder<> &Builder, Value *Ptr,
   case coro::ABI::Retcon:
   case coro::ABI::RetconOnce:
   case coro::ABI::RetconOnceDynamic: {
-    auto Dealloc = RetconLowering.Dealloc;
+    Function *Dealloc = nullptr;
+    if (isa_and_nonnull<CoroAllocaAllocFrameInst>(AI)) {
+      assert(ABI == coro::ABI::RetconOnceDynamic);
+      Dealloc = RetconLowering.DeallocFrame;
+    } else {
+      Dealloc = RetconLowering.Dealloc;
+    }
+    unsigned allocationParamIndex = 0;
     SmallVector<Value *, 2> Args;
-    unsigned sizeParamIndex = 0;
     if (ABI == coro::ABI::RetconOnceDynamic) {
-      sizeParamIndex = 1;
+      allocationParamIndex = 2;
+      Args.push_back(RetconLowering.Storage);
       Args.push_back(RetconLowering.Allocator);
+    } else {
+      Dealloc = RetconLowering.Dealloc;
     }
     Ptr = Builder.CreateBitCast(
-        Ptr, Dealloc->getFunctionType()->getParamType(sizeParamIndex));
+        Ptr, Dealloc->getFunctionType()->getParamType(allocationParamIndex));
     Args.push_back(Ptr);
     auto *Call = Builder.CreateCall(Dealloc, Args);
+    if (ABI == coro::ABI::RetconOnceDynamic) {
+      Call->addParamAttr(1, Attribute::SwiftCoro);
+    }
     propagateCallAttrsFromCallee(Call, Dealloc);
     addCallToCallGraph(CG, Call, Dealloc);
     return;
