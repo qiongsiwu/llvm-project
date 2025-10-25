@@ -507,6 +507,10 @@ public:
   /// Replace the current file manager and virtual file system.
   void setFileManager(IntrusiveRefCntPtr<FileManager> Value);
 
+  /// @}
+  /// @name Output Manager
+  /// @{
+
   /// Set the output manager.
   void setOutputBackend(IntrusiveRefCntPtr<llvm::vfs::OutputBackend> NewOutputs);
 

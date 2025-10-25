@@ -69,6 +69,276 @@ void good_struct_self_loop(cb *c) {
   }
 }
 
+// Inout pointer and count
+
+void good_inout_span(int *__counted_by(*count) *p, size_t *count, std::span<int> sp) {
+  *p = sp.data();
+  *count = sp.size();
+}
+
+void bad_inout_span(int *__counted_by(*count) *p, size_t *count, std::span<int> sp) {
+  *p = sp.data(); // TODO-expected-warning{{unsafe assignment to count-attributed pointer}}
+  *count = 42;
+}
+
+void good_inout_subspan_const(int *__counted_by(*count) *p, size_t *count, std::span<int> sp) {
+  *p = sp.first(42).data();
+  *count = 42;
+}
+
+void good_inout_subspan_var(int *__counted_by(*count) *p, size_t *count, std::span<int> sp, size_t new_count) {
+  *p = sp.first(new_count).data();
+  *count = new_count;
+}
+
+void good_inout_subspan_complex(int *__counted_by(*count) *p, size_t *count, std::span<int> sp, size_t i, size_t j) {
+  *p = sp.first(i + j * 2).data();
+  *count = i + j * 2;
+}
+
+void good_inout_span_if(int *__counted_by(*count) *p, size_t *count, std::span<int> sp) {
+  if (p && count) {
+    *p = sp.data();
+    *count = sp.size();
+  }
+}
+
+void bad_inout_span_if(int *__counted_by(*count) *p, size_t *count, std::span<int> sp, size_t size) {
+  if (p && count) {
+    *p = sp.data(); // TODO-expected-warning{{unsafe assignment to count-attributed pointer}}
+    *count = size;
+  }
+}
+
+class inout_class {
+  void good_inout_span(int *__counted_by(*count) *p, size_t *count, std::span<int> sp) {
+    *p = sp.data();
+    *count = sp.size();
+  }
+
+  void bad_inout_span(int *__counted_by(*count) *p, size_t *count, std::span<int> sp) {
+    *p = sp.data(); // TODO-expected-warning{{unsafe assignment to count-attributed pointer}}
+    *count = 42;
+  }
+
+  void good_inout_subspan_const(int *__counted_by(*count) *p, size_t *count, std::span<int> sp) {
+    *p = sp.first(42).data();
+    *count = 42;
+  }
+};
+
+// Inout pointer
+
+void bad_inout_ptr_span(int *__counted_by(count) *p, int count, std::span<int> sp) {
+  *p = sp.data(); // TODO-expected-warning{{unsafe assignment to count-attributed pointer}}
+}
+
+void good_inout_ptr_subspan(int *__counted_by(count) *p, size_t count, std::span<int> sp) {
+  *p = sp.first(count).data();
+}
+
+void good_inout_ptr_const_subspan(int *__counted_by(42) *p, std::span<int> sp) {
+  *p = sp.first(42).data();
+}
+
+void good_inout_ptr_multi_subspan(int *__counted_by(a + b) *p, size_t a, size_t b, std::span<int> sp) {
+  *p = sp.first(a + b).data();
+}
+
+class inout_ptr_class {
+  void bad_inout_ptr_span(int *__counted_by(count) *p, int count, std::span<int> sp) {
+    *p = sp.data(); // TODO-expected-warning{{unsafe assignment to count-attributed pointer}}
+  }
+
+  void good_inout_ptr_subspan(int *__counted_by(count) *p, size_t count, std::span<int> sp) {
+    *p = sp.first(count).data();
+  }
+};
+
+// Immutable pointers/dependent values
+
+void immutable_ptr_to_ptr(int *__counted_by(*count) *p, int *count) {
+  p = nullptr; // expected-warning{{cannot assign to parameter 'p' because it points to a count-attributed pointer}}
+  *count = 0;
+}
+
+void immutable_ptr_to_value(int *__counted_by(*count) *p, int *count) {
+  *p = nullptr;
+  count = nullptr; // expected-warning{{cannot assign to parameter 'count' because it points to a dependent count}}
+}
+
+void immutable_ptr_with_inout_value(int *__counted_by(*count) p, int *count) {
+  p = nullptr; // expected-warning{{cannot assign to parameter 'p' because its type depends on an inout dependent count}}
+  *count = 0;
+}
+
+void immutable_ptr_with_inout_value2(int *__counted_by(*count) p, int *__counted_by(*count) *q, int *count) {
+  p = nullptr;  // expected-warning{{cannot assign to parameter 'p' because its type depends on an inout dependent count}}
+  *q = nullptr;
+  *count = 0;
+}
+
+void immutable_value_with_inout_ptr(int *__counted_by(count) *p, int count) {
+  *p = nullptr;
+  count = 0; // expected-warning{{cannot assign to parameter 'count' because it's used as dependent count in an inout count-attributed pointer}}
+}
+
+void immutable_value_with_inout_ptr2(int *__counted_by(count) p, int *__counted_by(count) *q, int count) {
+  p = nullptr;
+  *q = nullptr;
+  count = 0; // expected-warning{{cannot assign to parameter 'count' because it's used as dependent count in an inout count-attributed pointer}}
+}
+
+class immutable_class {
+  void immutable_ptr_to_ptr(int *__counted_by(*count) *p, int *count) {
+    p = nullptr; // expected-warning{{cannot assign to parameter 'p' because it points to a count-attributed pointer}}
+    *count = 0;
+  }
+
+  void immutable_ptr_to_value(int *__counted_by(*count) *p, int *count) {
+    *p = nullptr;
+    count = nullptr; // expected-warning{{cannot assign to parameter 'count' because it points to a dependent count}}
+  }
+
+  void immutable_ptr_with_inout_value(int *__counted_by(*count) p, int *count) {
+    p = nullptr; // expected-warning{{cannot assign to parameter 'p' because its type depends on an inout dependent count}}
+    *count = 0;
+  }
+
+  void immutable_value_with_inout_ptr(int *__counted_by(count) *p, int count) {
+    *p = nullptr;
+    count = 0; // expected-warning{{cannot assign to parameter 'count' because it's used as dependent count in an inout count-attributed pointer}}
+  }
+};
+
+// Missing assignments
+
+void missing_ptr(int *__counted_by(count) p, int count) {
+  count = 0; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'p' missing}}
+}
+
+void missing_count(int *__counted_by(count) p, int count) {
+  p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'count' missing}}
+}
+
+void missing_structure(int *__counted_by(count) p, int count) {
+  {
+    p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'count' missing}}
+  }
+  {
+    count = 0;   // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'p' missing}}
+  }
+}
+
+void missing_structure2(int *__counted_by(count) p, int count) {
+  p = nullptr;   // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'count' missing}}
+  {
+    count = 0;   // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'p' missing}}
+  }
+}
+
+void missing_structure3(int *__counted_by(count) p, int count) {
+  p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'count' missing}}
+  if (count > 0) {
+    count = 0; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'p' missing}}
+  }
+}
+
+void missing_unrelated(int *__counted_by(count) p, int count, int *__counted_by(len) q, int len) {
+  p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'count' missing}}
+  len = 0;     // expected-warning{{bounds-attributed group requires assigning 'len, q', assignments to 'q' missing}}
+}
+
+void missing_complex_count1(int *__counted_by(a + b) p, int a, int b) {
+  p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'a, b, p', assignments to 'a, b' missing}}
+}
+
+void missing_complex_count2(int *__counted_by(a + b) p, int a, int b) {
+  p = nullptr;
+  a = 0; // expected-warning{{bounds-attributed group requires assigning 'a, b, p', assignments to 'b' missing}}
+}
+
+void missing_complex_count3(int *__counted_by(a + b) p, int a, int b) {
+  b = 0;
+  p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'a, b, p', assignments to 'a' missing}}
+}
+
+void missing_complex_count4(int *__counted_by(a + b) p, int a, int b) {
+  a = 0;
+  b = 0; // expected-warning{{bounds-attributed group requires assigning 'a, b, p', assignments to 'p' missing}}
+}
+
+void missing_complex_ptr1(int *__counted_by(count) p, int *__counted_by(count) q, int count) {
+  p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p, q', assignments to 'count, q' missing}}
+}
+
+void missing_complex_ptr2(int *__counted_by(count) p, int *__counted_by(count) q, int count) {
+  p = nullptr;
+  q = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p, q', assignments to 'count' missing}}
+}
+
+void missing_complex_ptr3(int *__counted_by(count) p, int *__counted_by(count) q, int count) {
+  count = 0;
+  p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p, q', assignments to 'q' missing}}
+}
+
+void missing_complex_ptr4(int *__counted_by(count) p, int *__counted_by(count) q, int count) {
+  q = nullptr;
+  count = 0; // expected-warning{{bounds-attributed group requires assigning 'count, p, q', assignments to 'p' missing}}
+}
+
+// Missing assignments in struct
+
+void missing_struct_ptr(cb *c) {
+  c->count = 0; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'p' missing}}
+}
+
+void missing_struct_count(cb *c) {
+  c->p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'count' missing}}
+}
+
+void missing_struct_unrelated(cb *c, cb *d) {
+  c->p = nullptr; // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'count' missing}}
+  d->count = 0;   // expected-warning{{bounds-attributed group requires assigning 'count, p', assignments to 'p' missing}}
+}
+
+// Duplicated assignments
+
+void duplicated_ptr(int *__counted_by(count) p, int count) {
+  p = nullptr; // expected-note{{previously assigned here}}
+  p = nullptr; // expected-warning{{duplicated assignment to parameter 'p' in bounds-attributed group}}
+  count = 0;
+}
+
+void duplicated_ptr2(int *__counted_by(count) p, int count) {
+  p = nullptr; // expected-note{{previously assigned here}}
+  count = 0;
+  p = nullptr; // expected-warning{{duplicated assignment to parameter 'p' in bounds-attributed group}}
+}
+
+void duplicated_count(int *__counted_by(count) p, int count) {
+  p = nullptr;
+  count = 0; // expected-note{{previously assigned here}}
+  count = 0; // expected-warning{{duplicated assignment to parameter 'count' in bounds-attributed group}}
+}
+
+void duplicated_count2(int *__counted_by(count) p, int count) {
+  count = 0; // expected-note{{previously assigned here}}
+  p = nullptr;
+  count = 0; // expected-warning{{duplicated assignment to parameter 'count' in bounds-attributed group}}
+}
+
+void duplicated_complex(int *__counted_by(a + b) p,
+                        int *__counted_by(a + b + c) q,
+                        int a, int b, int c) {
+  p = nullptr;
+  q = nullptr; // expected-note{{previously assigned here}}
+  a = 0;
+  b = 0;
+  c = 0;
+  q = nullptr; // expected-warning{{duplicated assignment to parameter 'q' in bounds-attributed group}}
+}
+
 // Assigns to bounds-attributed that we consider too complex to analyze.
 
 void too_complex_assign_to_ptr(int *__counted_by(count) p, int count, int *q) {

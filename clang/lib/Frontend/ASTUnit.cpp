@@ -1642,6 +1642,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
   AST->Reader = nullptr;
 
   // Create a file manager object to provide access to and cache the filesystem.
+  Clang->setVirtualFileSystem(AST->getVirtualFileSystemPtr());
   Clang->setFileManager(AST->getFileManagerPtr());
 
   // Create the source manager.
@@ -2283,6 +2284,7 @@ void ASTUnit::CodeComplete(
          "IR inputs not support here!");
 
   // Use the source and file managers that we were given.
+  Clang->setVirtualFileSystem(FileMgr->getVirtualFileSystemPtr());  
   Clang->setFileManager(FileMgr);
   Clang->setSourceManager(SourceMgr);
 

@@ -5654,6 +5654,148 @@ struct BoundsAttributedGroupFinder
   }
 };
 
+// Checks if the bounds-attributed group does not assign to implicitly
+// immutable objects (check below which patterns are considered immutable).
+// This function returns false iff at least one assignment modifies
+// bounds-attributed object that should be immutable.
+static bool checkImmutableBoundsAttributedObjects(
+    const BoundsAttributedAssignmentGroup &Group,
+    UnsafeBufferUsageHandler &Handler, ASTContext &Ctx) {
+  bool IsGroupSafe = true;
+
+  for (size_t I = 0, N = Group.Assignments.size(); I < N; ++I) {
+    const BinaryOperator *Assign = Group.Assignments[I];
+    const BoundsAttributedObject &Object = Group.AssignedObjects[I];
+
+    const ValueDecl *VD = Object.Decl;
+    QualType Ty = VD->getType();
+    int DerefLevel = Object.DerefLevel;
+
+    using AssignKind = UnsafeBufferUsageHandler::AssignToImmutableObjectKind;
+
+    // void foo(int *__counted_by(*len) *p, int *len) {
+    //   p = ...;
+    // }
+    if (DerefLevel == 0 && Ty->isPointerType() &&
+        Ty->getPointeeType()->isBoundsAttributedType()) {
+      Handler.handleAssignToImmutableObject(Assign, VD,
+                                            AssignKind::PointerToPointer,
+                                            /*IsRelatedToDecl=*/false, Ctx);
+      IsGroupSafe = false;
+    }
+
+    // void foo(int *__counted_by(*len) *p, int *len) {
+    //   len = ...;
+    // }
+    if (DerefLevel == 0 && VD->isDependentCountWithDeref()) {
+      Handler.handleAssignToImmutableObject(Assign, VD,
+                                            AssignKind::PointerToDependentCount,
+                                            /*IsRelatedToDecl=*/false, Ctx);
+      IsGroupSafe = false;
+    }
+
+    // `p` below should be immutable, because updating `p` would not be visible
+    // on the call-site to `foo`, but `*len` would, which invalidates the
+    // relation between the pointer and its count.
+    // void foo(int *__counted_by(*len) p, int *len) {
+    //   p = ...;
+    // }
+    if (DerefLevel == 0 && Ty->isCountAttributedTypeDependingOnInoutCount()) {
+      Handler.handleAssignToImmutableObject(
+          Assign, VD, AssignKind::PointerDependingOnInoutCount,
+          /*IsRelatedToDecl=*/false, Ctx);
+      IsGroupSafe = false;
+    }
+
+    // Same as above, we cannot update `len`, because it won't be visible on
+    // the call-site.
+    // void foo(int *__counted_by(len) *p, int *__counted_by(len) q, int len) {
+    //   len = ...; // bad because of p
+    // }
+    if (VD->isDependentCountWithoutDeref() &&
+        VD->isDependentCountThatIsUsedInInoutPointer()) {
+      assert(DerefLevel == 0);
+      Handler.handleAssignToImmutableObject(
+          Assign, VD, AssignKind::DependentCountUsedInInoutPointer,
+          /*IsRelatedToDecl=*/false, Ctx);
+      IsGroupSafe = false;
+    }
+  }
+
+  return IsGroupSafe;
+}
+
+// Checks if the bounds-attributed group has missing or duplicated assignments.
+// Each assignable decl in the group must be assigned exactly once.
+//
+// For example:
+//   void foo(int *__counted_by(a + b) p, int a, int b) {
+//     p = ...;
+//     p = ...; // duplicated
+//     a = ...;
+//     // b missing
+//   }
+// Note that the group consists of a, b, and p.
+//
+// The function returns true iff each assignable decl in the group is assigned
+// exactly once.
+static bool checkMissingAndDuplicatedAssignments(
+    const BoundsAttributedAssignmentGroup &Group,
+    UnsafeBufferUsageHandler &Handler, ASTContext &Ctx) {
+  llvm::SmallDenseMap<const ValueDecl *, const BinaryOperator *, 4>
+      AssignedDecls;
+
+  DependentDeclSetTy RequiredDecls = Group.DeclClosure;
+  for (const ValueDecl *VD : Group.DeclClosure) {
+    if (VD->isDependentCountWithoutDeref() &&
+        VD->isDependentCountThatIsUsedInInoutPointer()) {
+      // This value is immutable, so it's not required to be assigned.
+      RequiredDecls.erase(VD);
+    }
+  }
+
+  DependentDeclSetTy MissingDecls = RequiredDecls;
+
+  bool IsGroupSafe = true;
+
+  for (size_t I = 0, N = Group.Assignments.size(); I < N; ++I) {
+    const BinaryOperator *Assign = Group.Assignments[I];
+    const ValueDecl *VD = Group.AssignedObjects[I].Decl;
+
+    const auto [It, Inserted] = AssignedDecls.insert({VD, Assign});
+    if (Inserted)
+      MissingDecls.erase(VD);
+    else {
+      const BinaryOperator *PrevAssign = It->second;
+      Handler.handleDuplicatedAssignment(Assign, PrevAssign, VD,
+                                         /*IsRelatedToDecl=*/false, Ctx);
+      IsGroupSafe = false;
+    }
+  }
+
+  if (!MissingDecls.empty()) {
+    const Expr *LastAssign = Group.Assignments.back();
+    Handler.handleMissingAssignments(LastAssign, RequiredDecls, MissingDecls,
+                                     /*IsRelatedToDecl=*/false, Ctx);
+    IsGroupSafe = false;
+  }
+
+  return IsGroupSafe;
+}
+
+// Checks if the bounds-attributed group is safe. This function returns false
+// iff the assignment group is unsafe and diagnostics have been emitted.
+static bool
+checkBoundsAttributedGroup(const BoundsAttributedAssignmentGroup &Group,
+                           UnsafeBufferUsageHandler &Handler, ASTContext &Ctx) {
+  if (!checkImmutableBoundsAttributedObjects(Group, Handler, Ctx))
+    return false;
+  if (!checkMissingAndDuplicatedAssignments(Group, Handler, Ctx))
+    return false;
+  // TODO: Add more checks.
+  return true;
+}
+
 static void
 diagnoseTooComplexAssignToBoundsAttributed(const Expr *E, const ValueDecl *VD,
                                            UnsafeBufferUsageHandler &Handler,
@@ -5679,7 +5821,7 @@ static void checkBoundsSafetyAssignments(const Stmt *S,
                                          ASTContext &Ctx) {
   BoundsAttributedGroupFinder Finder(
       [&](const BoundsAttributedAssignmentGroup &Group) {
-        // TODO: Check group constraints.
+        checkBoundsAttributedGroup(Group, Handler, Ctx);
       },
       [&](const Expr *E, const ValueDecl *VD) {
         diagnoseTooComplexAssignToBoundsAttributed(E, VD, Handler, Ctx);

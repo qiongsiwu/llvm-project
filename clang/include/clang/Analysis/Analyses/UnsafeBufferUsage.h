@@ -149,6 +149,37 @@ public:
                                                      ASTContext &Ctx) {
     handleUnsafeOperation(E, IsRelatedToDecl, Ctx);
   }
+
+  enum class AssignToImmutableObjectKind {
+    PointerToPointer,
+    PointerToDependentCount,
+    PointerDependingOnInoutCount,
+    DependentCountUsedInInoutPointer,
+  };
+
+  virtual void handleAssignToImmutableObject(const BinaryOperator *Assign,
+                                             const ValueDecl *VD,
+                                             AssignToImmutableObjectKind Kind,
+                                             bool IsRelatedToDecl,
+                                             ASTContext &Ctx) {
+    handleUnsafeOperation(Assign, IsRelatedToDecl, Ctx);
+  }
+
+  virtual void handleMissingAssignments(
+      const Expr *LastAssignInGroup,
+      const llvm::SmallPtrSetImpl<const ValueDecl *> &Required,
+      const llvm::SmallPtrSetImpl<const ValueDecl *> &Missing,
+      bool IsRelatedToDecl, ASTContext &Ctx) {
+    handleUnsafeOperation(LastAssignInGroup, IsRelatedToDecl, Ctx);
+  }
+
+  virtual void handleDuplicatedAssignment(const BinaryOperator *Assign,
+                                          const BinaryOperator *PrevAssign,
+                                          const ValueDecl *VD,
+                                          bool IsRelatedToDecl,
+                                          ASTContext &Ctx) {
+    handleUnsafeOperation(Assign, IsRelatedToDecl, Ctx);
+  }
   /* TO_UPSTREAM(BoundsSafety) OFF */
 
   /// Invoked when a fix is suggested against a variable. This function groups
