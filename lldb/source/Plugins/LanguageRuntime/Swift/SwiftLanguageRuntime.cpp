@@ -2990,8 +2990,10 @@ MultiReadPointers(Process &process,
 
   // Move the results in the slots not filled by errors from the input.
   for (std::optional<addr_t> &maybe_result : final_results)
-    if (maybe_result)
-      maybe_result = results_ref.consume_front();
+    if (maybe_result) {
+      maybe_result = results_ref.front();
+      results_ref = results_ref.drop_front();
+    }
 
   assert(results_ref.empty());
   return final_results;

@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/Sequence.h"
 #include "llvm/Support/Error.h"
 #include <optional>
 #if LLDB_ENABLE_SWIFT
@@ -210,8 +211,10 @@ FindTaskIds(llvm::ArrayRef<std::optional<addr_t>> maybe_task_addrs,
   // Move the results into the slots not filled by errors from the input.
   llvm::ArrayRef<std::optional<addr_t>> results_ref = read_results;
   for (std::optional<addr_t> &maybe_result : final_results)
-    if (maybe_result)
-      maybe_result = results_ref.consume_front();
+    if (maybe_result) {
+      maybe_result = results_ref.front();
+      results_ref = results_ref.drop_front();
+    }
   assert(results_ref.empty());
 
   return final_results;
@@ -232,8 +235,11 @@ bool OperatingSystemSwiftTasks::UpdateThreadList(ThreadList &old_thread_list,
   llvm::SmallVector<std::optional<addr_t>> task_ids =
       FindTaskIds(task_addrs, *m_process);
 
-  for (const auto &[real_thread, task_addr, task_id] :
-       llvm::zip(locked_core_threads, task_addrs, task_ids)) {
+  for (uint64_t idx : llvm::seq<uint64_t>(task_addrs.size())) {
+    auto real_thread =
+        core_thread_list.GetThreadAtIndex(idx, /*can_update=*/false);
+    auto task_addr = task_addrs[idx];
+    auto task_id = task_ids[idx];
     // If this is not a thread running a Task, add it to the list as is.
     if (!task_id) {
       LLDB_LOG(log,
