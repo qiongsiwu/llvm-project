@@ -1105,7 +1105,7 @@ CompilerInstance::createOutputFileImpl(StringRef OutputPath, bool Binary,
            "File Manager is required to fix up relative path.\n");
 
     AbsPath.emplace(OutputPath);
-    FileMgr->FixupRelativePath(*AbsPath);
+    FileManager::fixupRelativePath(getFileSystemOpts(), *AbsPath);
     OutputPath = *AbsPath;
   }
 
