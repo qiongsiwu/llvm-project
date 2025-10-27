@@ -49,7 +49,7 @@ protected:
   }
 
 public:
-  virtual ~MCMachObjectTargetWriter();
+  ~MCMachObjectTargetWriter() override;
 
   Triple::ObjectFormatType getFormat() const override { return Triple::MachO; }
   static bool classof(const MCObjectTargetWriter *W) {
