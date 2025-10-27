@@ -12,6 +12,7 @@ add_llvm_tool(llvm-remarkutil
   RemarkFilter.cpp
   RemarkInstructionMix.cpp
   RemarkSizeDiff.cpp
+  RemarkSummary.cpp
   RemarkUtil.cpp
   RemarkUtilHelpers.cpp
   RemarkUtilRegistry.cpp
