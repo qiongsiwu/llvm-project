@@ -340,6 +340,7 @@ void coro::Shape::analyze(Function &F,
     RetconLowering.StorageSize = ContinuationId->getStorageSize();
     RetconLowering.StorageAlignment = ContinuationId->getStorageAlignment();
     RetconLowering.CoroFuncPointer = ContinuationId->getCoroFunctionPointer();
+    RetconLowering.TypeId = ContinuationId->getTypeId();
     break;
   }
   case Intrinsic::coro_id_retcon:
@@ -539,8 +540,8 @@ Value *coro::Shape::emitAlloc(IRBuilder<> &Builder, Value *Size,
   case coro::ABI::RetconOnceDynamic: {
     unsigned sizeParamIndex = 0;
     Function *Alloc = nullptr;
-    if (isa_and_nonnull<CoroAllocaAllocFrameInst>(AI)) {
-      assert(ABI == coro::ABI::RetconOnceDynamic);
+    if ((ABI == coro::ABI::RetconOnceDynamic) &&
+        isa<CoroAllocaAllocFrameInst>(AI)) {
       Alloc = RetconLowering.AllocFrame;
     } else {
       Alloc = RetconLowering.Alloc;
@@ -557,10 +558,18 @@ Value *coro::Shape::emitAlloc(IRBuilder<> &Builder, Value *Size,
         Size, Alloc->getFunctionType()->getParamType(sizeParamIndex),
         /*is signed*/ false);
     Args.push_back(Size);
-    if (ABI == coro::ABI::RetconOnce) {
-      ConstantInt *TypeId = RetconLowering.TypeId;
-      if (TypeId != nullptr)
+    if (ABI == coro::ABI::RetconOnce || ABI == coro::ABI::RetconOnceDynamic) {
+      Value *TypeId = nullptr;
+      if (RetconLowering.TypeId) {
+        if (auto *CAAFI = dyn_cast_or_null<CoroAllocaAllocFrameInst>(AI)) {
+          // If malloc type ids are being used, use the callee's type id when
+          // allocating the callee's frame.
+          TypeId = CAAFI->getTypeId();
+        } else {
+          TypeId = RetconLowering.TypeId;
+        }
         Args.push_back(TypeId);
+      }
     }
     auto *Call = Builder.CreateCall(Alloc, Args);
     if (ABI == coro::ABI::RetconOnceDynamic) {
@@ -587,7 +596,6 @@ void coro::Shape::emitDealloc(IRBuilder<> &Builder, Value *Ptr,
   case coro::ABI::RetconOnceDynamic: {
     Function *Dealloc = nullptr;
     if (isa_and_nonnull<CoroAllocaAllocFrameInst>(AI)) {
-      assert(ABI == coro::ABI::RetconOnceDynamic);
       Dealloc = RetconLowering.DeallocFrame;
     } else {
       Dealloc = RetconLowering.Dealloc;
@@ -741,6 +749,8 @@ void CoroIdRetconOnceDynamicInst::checkWellFormed() const {
   checkWFRetconPrototype(this, getArgOperand(PrototypeArg));
   checkWFAlloc(this, getArgOperand(AllocArg));
   checkWFDealloc(this, getArgOperand(DeallocArg));
+  checkWFAlloc(this, getArgOperand(AllocFrameArg));
+  checkWFDealloc(this, getArgOperand(DeallocFrameArg));
 }
 
 static void checkAsyncFuncPointer(const Instruction *I, Value *V) {
