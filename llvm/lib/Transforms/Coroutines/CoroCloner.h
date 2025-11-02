@@ -78,7 +78,7 @@ public:
       : OrigF(OrigF), Suffix(Suffix), Shape(Shape), FKind(FKind),
         Builder(OrigF.getContext()), TTI(TTI) {}
 
-  virtual ~BaseCloner() {}
+  virtual ~BaseCloner() = default;
 
   /// Create a clone for a continuation lowering.
   static Function *createClone(Function &OrigF, const Twine &Suffix,
