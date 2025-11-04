@@ -1184,8 +1184,10 @@ static void updateCoroFuncPointerContextSize(coro::Shape &Shape) {
   auto *OrigContextSize = FuncPtrStruct->getOperand(1);
   auto *NewContextSize = ConstantInt::get(OrigContextSize->getType(),
                                           Shape.RetconLowering.ContextSize);
-  auto *NewFuncPtrStruct = ConstantStruct::get(
-      FuncPtrStruct->getType(), OrigRelativeFunOffset, NewContextSize);
+  auto *OrigTypeID = FuncPtrStruct->getOperand(2);
+  auto *NewFuncPtrStruct =
+      ConstantStruct::get(FuncPtrStruct->getType(), OrigRelativeFunOffset,
+                          NewContextSize, OrigTypeID);
 
   Shape.RetconLowering.CoroFuncPointer->setInitializer(NewFuncPtrStruct);
 }
