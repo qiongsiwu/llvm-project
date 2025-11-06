@@ -213,7 +213,7 @@ void CommandObjectDWIMPrint::DoExecute(StringRef command,
   //   2. Verify the isa pointer is a known class
   //   3. Require addresses to be on the heap
   std::string modified_expr_storage;
-  bool is_swift = language == lldb::eLanguageTypeSwift;
+  bool is_swift = language.AsLanguageType() == lldb::eLanguageTypeSwift;
   if (is_swift && is_po) {
     lldb::addr_t addr;
     bool is_integer = !expr.getAsInteger(0, addr);
