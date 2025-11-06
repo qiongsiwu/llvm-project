@@ -137,9 +137,7 @@ static cl::opt<bool> VerifyNoAliasScopeDomination(
     cl::desc("Ensure that llvm.experimental.noalias.scope.decl for identical "
              "scopes are not dominating"));
 
-namespace llvm {
-
-struct VerifierSupport {
+struct llvm::VerifierSupport {
   raw_ostream *OS;
   const Module &M;
   ModuleSlotTracker MST;
@@ -318,8 +316,6 @@ public:
       WriteTs(V1, Vs...);
   }
 };
-
-} // namespace llvm
 
 namespace {
 
