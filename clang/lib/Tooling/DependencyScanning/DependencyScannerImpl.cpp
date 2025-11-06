@@ -1018,7 +1018,7 @@ bool CompilerInstanceWithContext::initialize(DiagnosticConsumer *DC) {
           Worker.Service, Worker.DepFS, false, nullptr, Worker.DepCASFS))
     return false;
 
-  llvm::SmallVector<StringRef> StableDirs = getInitialStableDirs(CI);
+  StableDirs = getInitialStableDirs(CI);
   auto MaybePrebuiltModulesASTMap =
       computePrebuiltModulesASTMap(CI, StableDirs);
   if (!MaybePrebuiltModulesASTMap)
