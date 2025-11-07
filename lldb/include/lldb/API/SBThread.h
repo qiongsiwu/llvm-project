@@ -190,6 +190,8 @@ public:
 
   lldb::SBFrame GetFrameAtIndex(uint32_t idx);
 
+  lldb::SBFrameList GetFrames();
+
   lldb::SBFrame GetSelectedFrame();
 
   lldb::SBFrame SetSelectedFrame(uint32_t frame_idx);
@@ -248,6 +250,7 @@ private:
   friend class SBSaveCoreOptions;
   friend class SBExecutionContext;
   friend class SBFrame;
+  friend class SBFrameList;
   friend class SBProcess;
   friend class SBDebugger;
   friend class SBValue;
