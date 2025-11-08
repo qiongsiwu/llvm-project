@@ -984,6 +984,7 @@ bool CompilerInstanceWithContext::initialize(DiagnosticConsumer *DC) {
       initVFSForByNameScanning(Worker.BaseFS, CommandLine, CWD,
                                "ScanningByName", Worker.CAS, Worker.DepCASFS);
 
+
   DiagEngineWithCmdAndOpts = std::make_unique<DignosticsEngineWithDiagOpts>(
       CommandLine, OverlayFS, *DiagConsumer);
 
