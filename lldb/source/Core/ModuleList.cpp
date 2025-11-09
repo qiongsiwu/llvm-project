@@ -1698,9 +1698,8 @@ llvm::Expected<bool> ModuleList::GetSharedModuleFromCAS(
   if (!*loaded)
     return false;
 
-  auto status =
-      GetSharedModule(module_spec, module_sp, nullptr, nullptr, nullptr,
-                      /*always_create=*/true);
+  auto status = GetSharedModule(module_spec, module_sp, nullptr, nullptr,
+                                /*always_create=*/true);
   if (status.Success())
     return true;
   return status.takeError();
