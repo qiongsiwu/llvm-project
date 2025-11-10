@@ -30,7 +30,6 @@
 #include "clang/Config/config.h"
 #include "clang/Driver/BoundsSafetyArgs.h"
 #include "clang/Driver/Driver.h"
-#include "clang/Driver/Options.h"
 #include "clang/Frontend/CommandLineSourceLoc.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
 #include "clang/Frontend/DependencyOutputOptions.h"
@@ -42,6 +41,7 @@
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Lex/PreprocessorOptions.h"
+#include "clang/Options/Options.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "clang/StaticAnalyzer/Core/AnalyzerOptions.h"
@@ -271,7 +271,7 @@ CowCompilerInvocation::getMutPreprocessorOutputOpts() {
 using ArgumentConsumer = CompilerInvocation::ArgumentConsumer;
 
 #define OPTTABLE_STR_TABLE_CODE
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef OPTTABLE_STR_TABLE_CODE
 
 static llvm::StringRef lookupStrInTable(unsigned Offset) {
@@ -279,7 +279,7 @@ static llvm::StringRef lookupStrInTable(unsigned Offset) {
 }
 
 #define SIMPLE_ENUM_VALUE_TABLE
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef SIMPLE_ENUM_VALUE_TABLE
 
 static std::optional<bool> normalizeSimpleFlag(OptSpecifier Opt,
@@ -1039,7 +1039,7 @@ static void GenerateAnalyzerArgs(const AnalyzerOptions &Opts,
 
 #define ANALYZER_OPTION_WITH_MARSHALLING(...)                                  \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef ANALYZER_OPTION_WITH_MARSHALLING
 
   if (Opts.AnalysisConstraintsOpt != RangeConstraintsModel) {
@@ -1126,7 +1126,7 @@ static bool ParseAnalyzerArgs(AnalyzerOptions &Opts, ArgList &Args,
 
 #define ANALYZER_OPTION_WITH_MARSHALLING(...)                                  \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef ANALYZER_OPTION_WITH_MARSHALLING
 
   if (Arg *A = Args.getLastArg(OPT_analyzer_constraints)) {
@@ -1767,7 +1767,7 @@ void CompilerInvocationBase::GenerateCodeGenArgs(const CodeGenOptions &Opts,
 
 #define CODEGEN_OPTION_WITH_MARSHALLING(...)                                   \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef CODEGEN_OPTION_WITH_MARSHALLING
 
   if (Opts.OptimizationLevel > 0) {
@@ -2079,7 +2079,7 @@ bool CompilerInvocation::ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args,
 
 #define CODEGEN_OPTION_WITH_MARSHALLING(...)                                   \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef CODEGEN_OPTION_WITH_MARSHALLING
 
   // At O0 we want to fully disable inlining outside of cases marked with
@@ -2597,7 +2597,7 @@ static void GenerateDependencyOutputArgs(const DependencyOutputOptions &Opts,
   const DependencyOutputOptions &DependencyOutputOpts = Opts;
 #define DEPENDENCY_OUTPUT_OPTION_WITH_MARSHALLING(...)                         \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef DEPENDENCY_OUTPUT_OPTION_WITH_MARSHALLING
 
   if (Opts.ShowIncludesDest != ShowIncludesDestination::None)
@@ -2632,7 +2632,7 @@ static bool ParseDependencyOutputArgs(DependencyOutputOptions &Opts,
   DependencyOutputOptions &DependencyOutputOpts = Opts;
 #define DEPENDENCY_OUTPUT_OPTION_WITH_MARSHALLING(...)                         \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef DEPENDENCY_OUTPUT_OPTION_WITH_MARSHALLING
 
   if (Args.hasArg(OPT_show_includes)) {
@@ -2783,7 +2783,7 @@ static void GenerateFileSystemArgs(const FileSystemOptions &Opts,
 
 #define FILE_SYSTEM_OPTION_WITH_MARSHALLING(...)                               \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef FILE_SYSTEM_OPTION_WITH_MARSHALLING
 }
 
@@ -2795,7 +2795,7 @@ static bool ParseFileSystemArgs(FileSystemOptions &Opts, const ArgList &Args,
 
 #define FILE_SYSTEM_OPTION_WITH_MARSHALLING(...)                               \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef FILE_SYSTEM_OPTION_WITH_MARSHALLING
 
   return Diags.getNumErrors() == NumErrorsBefore;
@@ -2806,7 +2806,7 @@ static void GenerateMigratorArgs(const MigratorOptions &Opts,
   const MigratorOptions &MigratorOpts = Opts;
 #define MIGRATOR_OPTION_WITH_MARSHALLING(...)                                  \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef MIGRATOR_OPTION_WITH_MARSHALLING
 }
 
@@ -2818,7 +2818,7 @@ static bool ParseMigratorArgs(MigratorOptions &Opts, const ArgList &Args,
 
 #define MIGRATOR_OPTION_WITH_MARSHALLING(...)                                  \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef MIGRATOR_OPTION_WITH_MARSHALLING
 
   return Diags.getNumErrors() == NumErrorsBefore;
@@ -2830,7 +2830,7 @@ void CompilerInvocationBase::GenerateDiagnosticArgs(
   const DiagnosticOptions *DiagnosticOpts = &Opts;
 #define DIAG_OPTION_WITH_MARSHALLING(...)                                      \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef DIAG_OPTION_WITH_MARSHALLING
 
   if (!Opts.DiagnosticSerializationFile.empty())
@@ -2935,7 +2935,7 @@ bool clang::ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
 #define DIAG_OPTION_WITH_MARSHALLING(...)                                      \
   PARSE_OPTION_WITH_MARSHALLING(Args, *Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef DIAG_OPTION_WITH_MARSHALLING
 
   llvm::sys::Process::UseANSIEscapeCodes(Opts.UseANSIEscapeCodes);
@@ -3085,7 +3085,7 @@ static void GenerateFrontendArgs(const FrontendOptions &Opts,
   const FrontendOptions &FrontendOpts = Opts;
 #define FRONTEND_OPTION_WITH_MARSHALLING(...)                                  \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef FRONTEND_OPTION_WITH_MARSHALLING
 
   std::optional<OptSpecifier> ProgramActionOpt =
@@ -3262,7 +3262,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
 #define FRONTEND_OPTION_WITH_MARSHALLING(...)                                  \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef FRONTEND_OPTION_WITH_MARSHALLING
 
   Opts.ProgramAction = frontend::ParseSyntaxOnly;
@@ -3571,7 +3571,7 @@ static void GenerateHeaderSearchArgs(const HeaderSearchOptions &Opts,
   const HeaderSearchOptions *HeaderSearchOpts = &Opts;
 #define HEADER_SEARCH_OPTION_WITH_MARSHALLING(...)                             \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef HEADER_SEARCH_OPTION_WITH_MARSHALLING
 
   if (Opts.UseLibcxx)
@@ -3686,7 +3686,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
 
 #define HEADER_SEARCH_OPTION_WITH_MARSHALLING(...)                             \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef HEADER_SEARCH_OPTION_WITH_MARSHALLING
 
   if (const Arg *A = Args.getLastArg(OPT_stdlib_EQ))
@@ -4045,7 +4045,7 @@ void CompilerInvocationBase::GenerateLangArgs(const LangOptions &Opts,
 
 #define LANG_OPTION_WITH_MARSHALLING(...)                                      \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef LANG_OPTION_WITH_MARSHALLING
 
   if (Opts.NeededByPCHOrCompilationUsesPCH)
@@ -4458,7 +4458,7 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
 #define LANG_OPTION_WITH_MARSHALLING(...)                                      \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef LANG_OPTION_WITH_MARSHALLING
 
   if (Args.hasArg(OPT_fmodule_related_to_pch))
@@ -5198,7 +5198,7 @@ static void GeneratePreprocessorArgs(const PreprocessorOptions &Opts,
 
 #define PREPROCESSOR_OPTION_WITH_MARSHALLING(...)                              \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef PREPROCESSOR_OPTION_WITH_MARSHALLING
 
   if (Opts.PCHWithHdrStop && !Opts.PCHWithHdrStopCreate)
@@ -5272,7 +5272,7 @@ static bool ParsePreprocessorArgs(PreprocessorOptions &Opts, ArgList &Args,
 
 #define PREPROCESSOR_OPTION_WITH_MARSHALLING(...)                              \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef PREPROCESSOR_OPTION_WITH_MARSHALLING
 
   Opts.PCHWithHdrStop = Args.hasArg(OPT_pch_through_hdrstop_create) ||
@@ -5365,7 +5365,7 @@ GeneratePreprocessorOutputArgs(const PreprocessorOutputOptions &Opts,
 
 #define PREPROCESSOR_OUTPUT_OPTION_WITH_MARSHALLING(...)                       \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef PREPROCESSOR_OUTPUT_OPTION_WITH_MARSHALLING
 
   bool Generate_dM = isStrictlyPreprocessorAction(Action) && !Opts.ShowCPP;
@@ -5386,7 +5386,7 @@ static bool ParsePreprocessorOutputArgs(PreprocessorOutputOptions &Opts,
 
 #define PREPROCESSOR_OUTPUT_OPTION_WITH_MARSHALLING(...)                       \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef PREPROCESSOR_OUTPUT_OPTION_WITH_MARSHALLING
 
   Opts.ShowCPP = isStrictlyPreprocessorAction(Action) && !Args.hasArg(OPT_dM);
@@ -5401,7 +5401,7 @@ static void GenerateTargetArgs(const TargetOptions &Opts,
   const TargetOptions *TargetOpts = &Opts;
 #define TARGET_OPTION_WITH_MARSHALLING(...)                                    \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef TARGET_OPTION_WITH_MARSHALLING
 
   if (!Opts.SDKVersion.empty())
@@ -5420,7 +5420,7 @@ static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
 
 #define TARGET_OPTION_WITH_MARSHALLING(...)                                    \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef TARGET_OPTION_WITH_MARSHALLING
 
   if (Arg *A = Args.getLastArg(options::OPT_target_sdk_version_EQ)) {
