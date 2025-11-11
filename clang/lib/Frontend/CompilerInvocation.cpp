@@ -2760,7 +2760,7 @@ void CompilerInvocationBase::GenerateCASArgs(const CASOptions &Opts,
 
 #define CAS_OPTION_WITH_MARSHALLING(...)                                       \
   GENERATE_OPTION_WITH_MARSHALLING(Consumer, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef CAS_OPTION_WITH_MARSHALLING
 }
 
@@ -2771,7 +2771,7 @@ bool CompilerInvocation::ParseCASArgs(CASOptions &Opts, const ArgList &Args,
 
 #define CAS_OPTION_WITH_MARSHALLING(...)                                       \
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
-#include "clang/Driver/Options.inc"
+#include "clang/Options/Options.inc"
 #undef CAS_OPTION_WITH_MARSHALLING
 
   return Success;
