@@ -20,7 +20,7 @@
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/FrontendTool/Utils.h"
-#include "clang/Driver/Options.h"
+#include "clang/Options/Options.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
@@ -465,8 +465,6 @@ static int scanAndUpdateCC1(const char *Exec, ArrayRef<const char *> OldArgs,
                             const llvm::opt::ArgList &Args,
                             const CASOptions &CASOpts,
                             std::optional<llvm::cas::CASID> &RootID) {
-  using namespace clang::driver;
-
   llvm::ScopedDurationTimer ScopedTime([&Diag](double Seconds) {
     Diag.Report(diag::remark_compile_job_cache_timing_depscan)
         << llvm::format("%.6fs", Seconds);
@@ -475,7 +473,7 @@ static int scanAndUpdateCC1(const char *Exec, ArrayRef<const char *> OldArgs,
   StringRef WorkingDirectory;
   SmallString<128> WorkingDirectoryBuf;
   if (auto *Arg =
-          Args.getLastArg(clang::driver::options::OPT_working_directory)) {
+          Args.getLastArg(clang::options::OPT_working_directory)) {
     WorkingDirectory = Arg->getValue();
   } else {
     if (llvm::Error E = llvm::errorCodeToError(
@@ -513,7 +511,7 @@ static int scanAndUpdateCC1(const char *Exec, ArrayRef<const char *> OldArgs,
     Sharing.Path = A->getValue();
 
   StringRef Mode = "auto";
-  if (Arg *A = Args.getLastArg(clang::driver::options::OPT_fdepscan_EQ)) {
+  if (Arg *A = Args.getLastArg(clang::options::OPT_fdepscan_EQ)) {
     Mode = A->getValue();
     // Note: -cc1depscan does not accept '-fdepscan=off'.
     if (Mode != "daemon" && Mode != "inline" && Mode != "auto") {
@@ -569,7 +567,7 @@ int cc1depscan_main(ArrayRef<const char *> Argv, const char *Argv0,
     return 1;
 
   // FIXME: Create a new OptionFlag group for cc1depscan.
-  const OptTable &Opts = clang::driver::getDriverOptTable();
+  const OptTable &Opts = getDriverOptTable();
   unsigned MissingArgIndex, MissingArgCount;
   auto Args = Opts.ParseArgs(Argv, MissingArgIndex, MissingArgCount);
   if (MissingArgCount) {
@@ -578,18 +576,18 @@ int cc1depscan_main(ArrayRef<const char *> Argv, const char *Argv0,
     return 1;
   }
 
-  auto *CC1Args = Args.getLastArg(clang::driver::options::OPT_cc1_args);
+  auto *CC1Args = Args.getLastArg(clang::options::OPT_cc1_args);
   if (!CC1Args) {
     llvm::errs() << "missing -cc1-args option\n";
     return 1;
   }
 
-  auto *OutputArg = Args.getLastArg(clang::driver::options::OPT_o);
+  auto *OutputArg = Args.getLastArg(clang::options::OPT_o);
   std::string OutputPath = OutputArg ? OutputArg->getValue() : "-";
 
   std::optional<StringRef> DumpDepscanTree;
   if (auto *Arg =
-          Args.getLastArg(clang::driver::options::OPT_dump_depscan_tree_EQ))
+          Args.getLastArg(clang::options::OPT_dump_depscan_tree_EQ))
     DumpDepscanTree = Arg->getValue();
 
   SmallVector<const char *> NewArgs;
@@ -828,14 +826,14 @@ void ScanServer::start(bool Exclusive, ArrayRef<const char *> CASArgs) {
   DiagnosticOptions DiagOpts;
   DiagnosticsEngine Diags(new DiagnosticIDs(), DiagOpts);
 
-  const OptTable &Opts = clang::driver::getDriverOptTable();
+  const OptTable &Opts = getDriverOptTable();
   unsigned MissingArgIndex, MissingArgCount;
   auto ParsedCASArgs =
       Opts.ParseArgs(CASArgs, MissingArgIndex, MissingArgCount);
   CompilerInvocation::ParseCASArgs(CASOpts, ParsedCASArgs, Diags);
   CASOpts.ensurePersistentCAS();
   ProduceIncludeTree =
-      ParsedCASArgs.hasArg(clang::driver::options::OPT_fdepscan_include_tree);
+      ParsedCASArgs.hasArg(clang::options::OPT_fdepscan_include_tree);
 
   static std::once_flag ValidateOnce;
   std::call_once(ValidateOnce, [&] {
