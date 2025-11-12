@@ -24731,7 +24731,7 @@ Examples:
 
 .. _int_vp_load_ff:
 
-'``llvm.vp.load_ff``' Intrinsic
+'``llvm.vp.load.ff``' Intrinsic
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Syntax:
