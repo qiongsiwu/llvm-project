@@ -253,3 +253,8 @@ void test(StrBuff& str)
   LibC.strcpy(buff);
   LibC.memcpy(buff, buff, 64);
 }
+
+void dontCrashForInvalidFormatString() {
+  snprintf(nullptr, 0, "%");
+  snprintf(nullptr, 0, "\0");
+}
