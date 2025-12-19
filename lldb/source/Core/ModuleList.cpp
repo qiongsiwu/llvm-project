@@ -1289,10 +1289,11 @@ private:
         // BEGIN CAS
         to_remove.ForEach([&](auto &m) {
           auto it = m_module_configs.find(m.get());
-          if (it != m_module_configs.end()) {
-            m_cas_cache.erase(it->second.get());
-            m_module_configs.erase(it);
-          }
+          if (it != m_module_configs.end())
+            if (auto config = it->second) {
+              m_cas_cache.erase(config);
+              m_module_configs.erase(it);
+            }
           return IterationAction::Continue;
         });
         // END CAS
@@ -1314,13 +1315,10 @@ private:
 public:
   /// Each module may have a CAS config associated with it.
   /// Often many modules share the same CAS.
-  llvm::DenseMap<const Module *, std::shared_ptr<llvm::cas::CASConfiguration>>
-      m_module_configs;
-
-  llvm::StringMap<std::weak_ptr<llvm::cas::CASConfiguration>> m_cas_configs;
+  llvm::DenseMap<const Module *, llvm::cas::CASConfiguration> m_module_configs;
 
   /// Each CAS config has a CAS associated with it.
-  llvm::DenseMap<const llvm::cas::CASConfiguration *,
+  llvm::DenseMap<llvm::cas::CASConfiguration,
                  std::pair<std::shared_ptr<llvm::cas::ObjectStore>,
                            std::shared_ptr<llvm::cas::ActionCache>>>
       m_cas_cache;
@@ -1357,22 +1355,19 @@ static SharedModuleList &GetSharedModuleList() {
   return GetSharedModuleListInfo().module_list;
 }
 
-static std::shared_ptr<llvm::cas::CASConfiguration>
+static llvm::cas::CASConfiguration
 GetCASConfiguration(FileSpec CandidateConfigSearchPath) {
   // Config CAS from properties.
   auto &props = ModuleList::GetGlobalModuleListProperties();
   auto path = props.GetCASOnDiskPath().GetPath();
   if (!path.empty()) {
-    auto config = std::make_shared<llvm::cas::CASConfiguration>();
-    config->CASPath = props.GetCASOnDiskPath().GetPath();
-    config->PluginPath = props.GetCASPluginPath().GetPath();
-    config->PluginOptions = props.GetCASPluginOptions();
-    return config;
+    return {props.GetCASOnDiskPath().GetPath(),
+            props.GetCASPluginPath().GetPath(), props.GetCASPluginOptions()};
   }
   auto search_config = llvm::cas::CASConfiguration::createFromSearchConfigFile(
       CandidateConfigSearchPath.GetPath());
   if (search_config)
-    return std::make_shared<llvm::cas::CASConfiguration>(search_config->second);
+    return search_config->second;
 
   return {};
 }
@@ -1679,7 +1674,7 @@ static llvm::Expected<bool> loadModuleFromCASImpl(llvm::StringRef cas_id,
 
   // Swap out the module_spec with the one loaded via CAS.
   FileSpec cas_spec;
-  cas_spec.SetDirectory(ConstString(maybe_cas->configuration->CASPath));
+  cas_spec.SetDirectory(ConstString(maybe_cas->configuration.CASPath));
   cas_spec.SetFilename(ConstString(cas_id));
   ModuleSpec loaded(cas_spec, module_spec.GetUUID(), std::move(file_buffer));
   loaded.GetArchitecture() = module_spec.GetArchitecture();
@@ -1707,7 +1702,7 @@ static llvm::Expected<bool> loadModuleFromCAS(llvm::StringRef cas_id,
   return result;
 }
 
-static std::shared_ptr<llvm::cas::CASConfiguration>
+static llvm::cas::CASConfiguration
 FindCASConfiguration(const ModuleSP &module_sp) {
   auto get_dir = [](FileSpec path) {
     path.ClearFilename();
@@ -1716,7 +1711,7 @@ FindCASConfiguration(const ModuleSP &module_sp) {
 
   // Look near the binary / dSYM.
   std::set<FileSpec> unique_paths;
-  std::shared_ptr<llvm::cas::CASConfiguration> cas_config =
+  llvm::cas::CASConfiguration cas_config =
       GetCASConfiguration(module_sp->GetFileSpec());
 
   if (!cas_config) {
@@ -1764,10 +1759,9 @@ ModuleList::GetOrCreateCAS(const ModuleSP &module_sp) {
   auto &shared_module_list = GetSharedModuleListInfo();
   std::scoped_lock<std::mutex> lock(shared_module_list.shared_lock);
   auto &module_configs = shared_module_list.module_list.m_module_configs;
-  auto &cas_configs = shared_module_list.module_list.m_cas_configs;
   auto &cas_cache = shared_module_list.module_list.m_cas_cache;
 
-  std::shared_ptr<llvm::cas::CASConfiguration> cas_config;
+  llvm::cas::CASConfiguration cas_config;
   {
     auto cached_config = module_configs.find(module_sp.get());
     if (cached_config != module_configs.end()) {
@@ -1779,15 +1773,6 @@ ModuleList::GetOrCreateCAS(const ModuleSP &module_sp) {
 
   if (!cas_config) {
     cas_config = FindCASConfiguration(module_sp);
-    if (cas_config) {
-      // Unique the configuration. This assumes that no two configs
-      // with different plugins share the same path.
-      auto it = cas_configs.find(cas_config->CASPath);
-      if (it != cas_configs.end())
-        if (auto unique_config = it->second.lock())
-          cas_config = unique_config;
-      cas_configs.insert({cas_config->CASPath, cas_config});
-    }
     // Cache the config or lack thereof.
     module_configs.insert({module_sp.get(), cas_config});
   }
@@ -1797,7 +1782,7 @@ ModuleList::GetOrCreateCAS(const ModuleSP &module_sp) {
 
   // Look in the cache.
   {
-    auto cached = cas_cache.find(cas_config.get());
+    auto cached = cas_cache.find(cas_config);
     if (cached != cas_cache.end()) {
       if (!cached->second.first)
         return llvm::createStringError(
@@ -1808,15 +1793,15 @@ ModuleList::GetOrCreateCAS(const ModuleSP &module_sp) {
   }
 
   // Create the CAS.
-  auto cas = cas_config->createDatabases();
+  auto cas = cas_config.createDatabases();
   if (!cas) {
-    cas_cache.insert({cas_config.get(), {}});
+    cas_cache.insert({cas_config, {}});
     return cas.takeError();
   }
 
   LLDB_LOG(GetLog(LLDBLog::Modules | LLDBLog::Symbols),
-           "Initialized CAS at {0}", cas_config->CASPath);
-  cas_cache.insert({cas_config.get(), {cas->first, cas->second}});
+           "Initialized CAS at {0}", cas_config.CASPath);
+  cas_cache.insert({cas_config, {cas->first, cas->second}});
   return ModuleList::CAS{cas_config, cas->first, cas->second};
 }
 
