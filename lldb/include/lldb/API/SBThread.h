@@ -182,7 +182,7 @@ public:
 
   lldb::SBFrame GetFrameAtIndex(uint32_t idx);
 
-  lldb::SBFrameList GetFrames();
+  lldb::SBFrameList GetFrames() const;
 
   lldb::SBFrame GetSelectedFrame();
 
