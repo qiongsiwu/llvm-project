@@ -245,8 +245,17 @@ DependencyScanningWorker::computeDependenciesByNameWithContextOrError(
 
 llvm::Error
 DependencyScanningWorker::finalizeCompilerInstanceWithContextOrError() {
-  bool Success = finalizeCompilerInstance();
-  return CIWithContext->handleReturnStatus(Success);
+  // TODO: this finalization interface is not ideal. Finalizing the
+  // CIWithContext should happen automatically for successful scans, and
+  // when errors occur.
+  if (CIWithContext) {
+    bool Success = finalizeCompilerInstance();
+    return CIWithContext->handleReturnStatus(Success);
+  }
+
+  // There is nothing to finalize, so the finalization should not report an
+  // error.
+  return llvm::Error::success();
 }
 
 bool DependencyScanningWorker::initializeCompilerInstanceWithContext(
@@ -265,5 +274,6 @@ bool DependencyScanningWorker::computeDependenciesByNameWithContext(
 }
 
 bool DependencyScanningWorker::finalizeCompilerInstance() {
+  assert(CIWithContext && "Should not finalize without a CIWithContext");
   return CIWithContext->finalize();
 }
