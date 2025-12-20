@@ -9421,6 +9421,9 @@ bool SwiftASTContext::GetCompileUnitImportsImpl(
   // If EBM is enabled, disable implicit modules during contextual imports.
   // fixme nullptr!
   bool turn_off_implicit = m_has_explicit_modules;
+  if (Target::GetGlobalProperties().GetSwiftAllowImplicitModules())
+    turn_off_implicit = false;
+  
   auto reset = llvm::make_scope_exit([&] {
     if (turn_off_implicit) {
       LOG_PRINTF(GetLog(LLDBLog::Types), "Turning on implicit modules");
