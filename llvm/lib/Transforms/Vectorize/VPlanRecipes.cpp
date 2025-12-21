@@ -2991,7 +2991,8 @@ bool VPReplicateRecipe::shouldPack() const {
 /// address cost. Computing SCEVs for VPValues is incomplete and returns
 /// SCEVCouldNotCompute in cases the legacy cost model can compute SCEVs. In
 /// those cases we fall back to the legacy cost model. Otherwise return nullptr.
-static const SCEV *getAddressAccessSCEV(const VPValue *Ptr, ScalarEvolution &SE,
+static const SCEV *getAddressAccessSCEV(const VPValue *Ptr,
+                                        PredicatedScalarEvolution &PSE,
                                         const Loop *L) {
   using namespace llvm::VPlanPatternMatch;
   auto *PtrR = Ptr->getDefiningRecipe();
@@ -3002,11 +3003,11 @@ static const SCEV *getAddressAccessSCEV(const VPValue *Ptr, ScalarEvolution &SE,
                  match(Ptr, m_GetElementPtr(m_VPValue(), m_VPValue()))))
     return nullptr;
 
-  const SCEV *Addr = vputils::getSCEVExprForVPValue(Ptr, SE, L);
+  const SCEV *Addr = vputils::getSCEVExprForVPValue(Ptr, PSE, L);
   if (isa<SCEVCouldNotCompute>(Addr))
     return Addr;
 
-  return vputils::isAddressSCEVForCost(Addr, SE, L) ? Addr : nullptr;
+  return vputils::isAddressSCEVForCost(Addr, *PSE.getSE(), L) ? Addr : nullptr;
 }
 
 /// Returns true if \p V is used as part of the address of another load or
@@ -3175,7 +3176,7 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
 
     bool IsLoad = UI->getOpcode() == Instruction::Load;
     const VPValue *PtrOp = getOperand(!IsLoad);
-    const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.SE, Ctx.L);
+    const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
     if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
       break;
 
@@ -3194,7 +3195,7 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     InstructionCost ScalarCost =
         ScalarMemOpCost +
         Ctx.TTI.getAddressComputationCost(
-            PtrTy, UsedByLoadStoreAddress ? nullptr : &Ctx.SE, PtrSCEV);
+            PtrTy, UsedByLoadStoreAddress ? nullptr : Ctx.PSE.getSE(), PtrSCEV);
     if (isSingleScalar())
       return ScalarCost;
 

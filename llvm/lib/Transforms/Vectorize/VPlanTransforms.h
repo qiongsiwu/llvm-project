@@ -225,7 +225,8 @@ struct VPlanTransforms {
   /// one step backwards.
   static void
   optimizeInductionExitUsers(VPlan &Plan,
-                             DenseMap<VPValue *, VPValue *> &EndValues);
+                             DenseMap<VPValue *, VPValue *> &EndValues,
+                             PredicatedScalarEvolution &PSE);
 
   /// Add explicit broadcasts for live-ins and VPValues defined in \p Plan's entry block if they are used as vectors.
   static void materializeBroadcasts(VPlan &Plan);
@@ -238,14 +239,14 @@ struct VPlanTransforms {
   /// Hoist predicated loads from the same address to the loop entry block, if
   /// they are guaranteed to execute on both paths (i.e., in replicate regions
   /// with complementary masks P and NOT P).
-  static void hoistPredicatedLoads(VPlan &Plan, ScalarEvolution &SE,
+  static void hoistPredicatedLoads(VPlan &Plan, PredicatedScalarEvolution &PSE,
                                    const Loop *L);
 
   /// Sink predicated stores to the same address with complementary predicates
   /// (P and NOT P) to an unconditional store with select recipes for the
   /// stored values. This eliminates branching overhead when all paths
   /// unconditionally store to the same location.
-  static void sinkPredicatedStores(VPlan &Plan, ScalarEvolution &SE,
+  static void sinkPredicatedStores(VPlan &Plan, PredicatedScalarEvolution &PSE,
                                    const Loop *L);
 
   /// Add explicit Build[Struct]Vector recipes that combine multiple scalar
