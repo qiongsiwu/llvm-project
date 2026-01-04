@@ -23,6 +23,7 @@
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
@@ -2990,26 +2991,14 @@ bool VPReplicateRecipe::shouldPack() const {
 /// address cost. Computing SCEVs for VPValues is incomplete and returns
 /// SCEVCouldNotCompute in cases the legacy cost model can compute SCEVs. In
 /// those cases we fall back to the legacy cost model. Otherwise return nullptr.
-static const SCEV *getAddressAccessSCEV(const VPValue *Ptr, ScalarEvolution &SE,
+static const SCEV *getAddressAccessSCEV(const VPValue *Ptr,
+                                        PredicatedScalarEvolution &PSE,
                                         const Loop *L) {
-  using namespace llvm::VPlanPatternMatch;
-  auto *PtrR = Ptr->getDefiningRecipe();
-  if (!PtrR || !((isa<VPReplicateRecipe>(PtrR) &&
-                  cast<VPReplicateRecipe>(PtrR)->getOpcode() ==
-                      Instruction::GetElementPtr) ||
-                 isa<VPWidenGEPRecipe>(PtrR) ||
-                 match(Ptr, m_GetElementPtr(m_VPValue(), m_VPValue()))))
-    return nullptr;
+  const SCEV *Addr = vputils::getSCEVExprForVPValue(Ptr, PSE, L);
+  if (isa<SCEVCouldNotCompute>(Addr))
+    return Addr;
 
-  // We are looking for a GEP where all indices are either loop invariant or
-  // inductions.
-  for (VPValue *Opd : drop_begin(PtrR->operands())) {
-    if (!Opd->isDefinedOutsideLoopRegions() &&
-        !isa<VPScalarIVStepsRecipe, VPWidenIntOrFpInductionRecipe>(Opd))
-      return nullptr;
-  }
-
-  return vputils::getSCEVExprForVPValue(Ptr, SE, L);
+  return vputils::isAddressSCEVForCost(Addr, *PSE.getSE(), L) ? Addr : nullptr;
 }
 
 /// Returns true if \p V is used as part of the address of another load or
@@ -3178,7 +3167,7 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
 
     bool IsLoad = UI->getOpcode() == Instruction::Load;
     const VPValue *PtrOp = getOperand(!IsLoad);
-    const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.SE, Ctx.L);
+    const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
     if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
       break;
 
@@ -3197,7 +3186,7 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     InstructionCost ScalarCost =
         ScalarMemOpCost +
         Ctx.TTI.getAddressComputationCost(
-            PtrTy, UsedByLoadStoreAddress ? nullptr : &Ctx.SE, PtrSCEV);
+            PtrTy, UsedByLoadStoreAddress ? nullptr : Ctx.PSE.getSE(), PtrSCEV);
     if (isSingleScalar())
       return ScalarCost;
 
