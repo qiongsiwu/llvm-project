@@ -31,14 +31,14 @@ entry:
 
   call void @llvm.lifetime.start.p0(i64 8, ptr %x)
   ; Lifetime intrinsics use the untagged pointers
-  ; CHECK: call void @llvm.lifetime.start.p0(ptr %x)
+  ; CHECK: call void @llvm.lifetime.start.p0(i64 8, ptr %x)
 
   %x._value = getelementptr inbounds nuw %TSi, ptr %x, i32 0, i32 0
   ; CHECK: %x._value = getelementptr inbounds nuw %TSi, ptr [[XTAGGED]], i32 0, i32 0
   store i64 0, ptr %x._value, align 8
 
   call void @llvm.lifetime.start.p0(i64 8, ptr %y)
-  ; CHECK: call void @llvm.lifetime.start.p0(ptr %y)
+  ; CHECK: call void @llvm.lifetime.start.p0(i64 8, ptr %y)
 
   %y._value = getelementptr inbounds nuw %TSd, ptr %y, i32 0, i32 0
   ; CHECK: %y._value = getelementptr inbounds nuw %TSd, ptr [[YTAGGED]], i32 0, i32 0
@@ -49,8 +49,8 @@ entry:
   call void @llvm.lifetime.end.p0(i64 8, ptr %y)
   call void @llvm.lifetime.end.p0(i64 8, ptr %x)
 
-  ; CHECK: call void @llvm.lifetime.end.p0(ptr %y)
-  ; CHECK: call void @llvm.lifetime.end.p0(ptr %x)
+  ; CHECK: call void @llvm.lifetime.end.p0(i64 8, ptr %y)
+  ; CHECK: call void @llvm.lifetime.end.p0(i64 8, ptr %x)
 
   ret void
 }
