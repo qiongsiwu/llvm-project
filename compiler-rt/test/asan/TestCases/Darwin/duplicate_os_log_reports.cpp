@@ -1,4 +1,4 @@
-// UNSUPPORTED: ios
+// UNSUPPORTED: darwin-remote
 // REQUIRES: shell
 // REQUIRES: darwin_log_cmd
 // RUN: %clangxx_asan -fsanitize-recover=address %s -o %t
