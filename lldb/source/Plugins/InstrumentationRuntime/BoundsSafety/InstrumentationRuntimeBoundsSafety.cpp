@@ -1,4 +1,4 @@
-//===-- InstrumentationRuntimeBoundsSafety.cpp -----------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -29,25 +29,29 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 
 #include <memory>
+#include <type_traits>
 
 using namespace lldb;
 using namespace lldb_private;
 
 LLDB_PLUGIN_DEFINE(InstrumentationRuntimeBoundsSafety)
 
-#define BOUNDS_SAFETY_SOFT_TRAP_MINIMAL "__bounds_safety_soft_trap"
-#define BOUNDS_SAFETY_SOFT_TRAP_S "__bounds_safety_soft_trap_s"
+constexpr llvm::StringLiteral
+    BoundsSafetySoftTrapMinimal("__bounds_safety_soft_trap");
+constexpr llvm::StringLiteral
+    BoundsSafetySoftTrapStr("__bounds_safety_soft_trap_s");
 
-const std::vector<std::string> &getBoundsSafetySoftTrapRuntimeFuncs() {
-  static std::vector<std::string> Funcs = {BOUNDS_SAFETY_SOFT_TRAP_MINIMAL,
-                                           BOUNDS_SAFETY_SOFT_TRAP_S};
-
-  return Funcs;
+constexpr std::array<llvm::StringLiteral, 2>
+getBoundsSafetySoftTrapRuntimeFuncs() {
+  return {BoundsSafetySoftTrapMinimal, BoundsSafetySoftTrapStr};
 }
 
 #define SOFT_TRAP_CATEGORY_PREFIX "Soft "
 #define SOFT_TRAP_FALLBACK_CATEGORY                                            \
   SOFT_TRAP_CATEGORY_PREFIX "Bounds check failed"
+
+using ComputedStopInfo =
+    std::pair<std::optional<std::string>, std::optional<uint32_t>>;
 
 class InstrumentationBoundsSafetyStopInfo : public StopInfo {
 public:
@@ -74,16 +78,14 @@ public:
 private:
   InstrumentationBoundsSafetyStopInfo(Thread &thread);
 
-  std::pair<std::optional<std::string>, std::optional<uint32_t>>
+  ComputedStopInfo
   ComputeStopReasonAndSuggestedStackFrame(bool &warning_emitted_for_failure);
 
-  std::pair<std::string, std::optional<uint32_t>>
-  ComputeStopReasonAndSuggestedStackFrameWithDebugInfo(
+  ComputedStopInfo ComputeStopReasonAndSuggestedStackFrameWithDebugInfo(
       lldb::StackFrameSP parent_sf, lldb::user_id_t debugger_id,
       bool &warning_emitted_for_failure);
 
-  std::pair<std::optional<std::string>, std::optional<uint32_t>>
-  ComputeStopReasonAndSuggestedStackFrameWithoutDebugInfo(
+  ComputedStopInfo ComputeStopReasonAndSuggestedStackFrameWithoutDebugInfo(
       ThreadSP thread_sp, lldb::user_id_t debugger_id,
       bool &warning_emitted_for_failure);
 };
@@ -91,22 +93,22 @@ private:
 InstrumentationBoundsSafetyStopInfo::InstrumentationBoundsSafetyStopInfo(
     Thread &thread)
     : StopInfo(thread, 0) {
-  // No additional data describing the reason for stopping
+  // No additional data describing the reason for stopping.
   m_extended_info = nullptr;
   m_description = SOFT_TRAP_FALLBACK_CATEGORY;
 
   bool warning_emitted_for_failure = false;
-  auto [Description, MaybeSuggestedStackIndex] =
+  auto [MaybeDescription, MaybeSuggestedStackIndex] =
       ComputeStopReasonAndSuggestedStackFrame(warning_emitted_for_failure);
-  if (Description)
-    m_description = Description.value();
+  if (MaybeDescription)
+    m_description = MaybeDescription.value();
   if (MaybeSuggestedStackIndex)
     m_value = MaybeSuggestedStackIndex.value();
 
   // Emit warning about the failure to compute the stop info if one wasn't
-  // already emitted
-  if ((!Description.has_value()) && !warning_emitted_for_failure) {
-    if (auto thread_sp = GetThread()) {
+  // already emitted.
+  if ((!MaybeDescription.has_value()) && !warning_emitted_for_failure) {
+    if (ThreadSP thread_sp = GetThread()) {
       lldb::user_id_t debugger_id =
           thread_sp->GetProcess()->GetTarget().GetDebugger().GetID();
       Debugger::ReportWarning(
@@ -116,29 +118,35 @@ InstrumentationBoundsSafetyStopInfo::InstrumentationBoundsSafetyStopInfo(
   }
 }
 
-std::pair<std::optional<std::string>, std::optional<uint32_t>>
+// Helper functions to make it convenient to log a failure and then return.
+template <typename T, typename... ArgTys>
+[[nodiscard]] T LogBeforeReturn(ArgTys &&...Args) {
+  LLDB_LOG(GetLog(LLDBLog::InstrumentationRuntime), Args...);
+  return T();
+}
+
+template <typename... ArgTys>
+[[nodiscard]] ComputedStopInfo LogFailedCSI(ArgTys &&...Args) {
+  return LogBeforeReturn<ComputedStopInfo>(Args...);
+}
+
+ComputedStopInfo
 InstrumentationBoundsSafetyStopInfo::ComputeStopReasonAndSuggestedStackFrame(
     bool &warning_emitted_for_failure) {
-  auto *log_category = GetLog(LLDBLog::InstrumentationRuntime);
   ThreadSP thread_sp = GetThread();
-  if (!thread_sp) {
-    LLDB_LOGF(log_category, "failed to get thread while stopped");
-    return {};
-  }
+  if (!thread_sp)
+    return LogFailedCSI("failed to get thread while stopped");
 
   lldb::user_id_t debugger_id =
       thread_sp->GetProcess()->GetTarget().GetDebugger().GetID();
 
-  auto parent_sf = thread_sp->GetStackFrameAtIndex(1);
-  if (!parent_sf) {
-    LLDB_LOGF(log_category, "got nullptr when fetching stackframe at index 1");
-    return {};
-  }
+  StackFrameSP parent_sf = thread_sp->GetStackFrameAtIndex(1);
+  if (!parent_sf)
+    return LogFailedCSI("got nullptr when fetching stackframe at index 1");
 
-  if (parent_sf->HasDebugInformation()) {
+  if (parent_sf->HasDebugInformation())
     return ComputeStopReasonAndSuggestedStackFrameWithDebugInfo(
         parent_sf, debugger_id, warning_emitted_for_failure);
-  }
 
   // If the debug info is missing we can still get some information
   // from the parameter in the soft trap runtime call.
@@ -146,8 +154,7 @@ InstrumentationBoundsSafetyStopInfo::ComputeStopReasonAndSuggestedStackFrame(
       thread_sp, debugger_id, warning_emitted_for_failure);
 }
 
-std::pair<std::string, std::optional<uint32_t>>
-InstrumentationBoundsSafetyStopInfo::
+ComputedStopInfo InstrumentationBoundsSafetyStopInfo::
     ComputeStopReasonAndSuggestedStackFrameWithDebugInfo(
         lldb::StackFrameSP parent_sf, lldb::user_id_t debugger_id,
         bool &warning_emitted_for_failure) {
@@ -160,19 +167,17 @@ InstrumentationBoundsSafetyStopInfo::
   // frame #2: `bad_read(index=10)
   // ```
   // ....
-  const auto *TrapReasonFuncName = parent_sf->GetFunctionName();
+  const char *TrapReasonFuncName = parent_sf->GetFunctionName();
 
   auto MaybeTrapReason =
       clang::CodeGen::DemangleTrapReasonInDebugInfo(TrapReasonFuncName);
-  if (!MaybeTrapReason.has_value()) {
-    LLDB_LOGF(
-        GetLog(LLDBLog::InstrumentationRuntime),
-        "clang::CodeGen::DemangleTrapReasonInDebugInfo(\"%s\") call failed",
+  if (!MaybeTrapReason.has_value())
+    return LogFailedCSI(
+        "clang::CodeGen::DemangleTrapReasonInDebugInfo(\"{0}\") call failed",
         TrapReasonFuncName);
-    return {};
-  }
-  auto category = MaybeTrapReason.value().first;
-  auto message = MaybeTrapReason.value().second;
+
+  llvm::StringRef category = MaybeTrapReason.value().first;
+  llvm::StringRef message = MaybeTrapReason.value().second;
 
   // TODO: Clang should probably be changed to emit the "Soft " prefix itself
   std::string stop_reason;
@@ -197,21 +202,17 @@ InstrumentationBoundsSafetyStopInfo::
   return std::make_pair(stop_reason, parent_sf->GetFrameIndex() + 1);
 }
 
-std::pair<std::optional<std::string>, std::optional<uint32_t>>
-InstrumentationBoundsSafetyStopInfo::
+ComputedStopInfo InstrumentationBoundsSafetyStopInfo::
     ComputeStopReasonAndSuggestedStackFrameWithoutDebugInfo(
         ThreadSP thread_sp, lldb::user_id_t debugger_id,
         bool &warning_emitted_for_failure) {
 
-  auto *log_category = GetLog(LLDBLog::InstrumentationRuntime);
-  auto softtrap_sf = thread_sp->GetStackFrameAtIndex(0);
-  if (!softtrap_sf) {
-    LLDB_LOGF(log_category, "got nullptr when fetching stackframe at index 0");
-    return {};
-  }
+  StackFrameSP softtrap_sf = thread_sp->GetStackFrameAtIndex(0);
+  if (!softtrap_sf)
+    return LogFailedCSI("got nullptr when fetching stackframe at index 0");
   llvm::StringRef trap_reason_func_name = softtrap_sf->GetFunctionName();
 
-  if (trap_reason_func_name == BOUNDS_SAFETY_SOFT_TRAP_MINIMAL) {
+  if (trap_reason_func_name == BoundsSafetySoftTrapMinimal) {
     // This function has no arguments so there's no additional information
     // that would allow us to identify the trap reason.
     //
@@ -228,77 +229,71 @@ InstrumentationBoundsSafetyStopInfo::
     // This makes it look we stopped after finishing the call to
     // `__bounds_safety_soft_trap` but actually we are in the middle of the
     // call. To avoid this confusion just use the current frame.
-    Debugger::ReportWarning(
-        "specific BoundsSafety trap reason is not available because debug "
-        "info is missing on the caller of '" BOUNDS_SAFETY_SOFT_TRAP_MINIMAL
-        "'",
-        debugger_id);
+    std::string warning;
+    llvm::raw_string_ostream ss(warning);
+    ss << "specific BoundsSafety trap reason is not available because debug "
+          "info is missing on the caller of '"
+       << BoundsSafetySoftTrapMinimal << "'";
+    Debugger::ReportWarning(warning.c_str(), debugger_id);
     warning_emitted_for_failure = true;
     return {};
   }
 
-  // BOUNDS_SAFETY_SOFT_TRAP_S has one argument which is a pointer to a string
+  // __bounds_safety_soft_trap_s has one argument which is a pointer to a string
   // describing the trap or a nullptr.
-  if (trap_reason_func_name != BOUNDS_SAFETY_SOFT_TRAP_S) {
-    LLDB_LOGF(log_category,
-              "unexpected function name. Expected \"%s\" but got \"%s\"",
-              BOUNDS_SAFETY_SOFT_TRAP_S, trap_reason_func_name.data());
+  if (trap_reason_func_name != BoundsSafetySoftTrapStr) {
     assert(0 && "hit breakpoint for unexpected function name");
-    return {};
+    return LogFailedCSI(
+        "unexpected function name. Expected \"{0}\" but got \"{1}\"",
+        BoundsSafetySoftTrapStr.data(), trap_reason_func_name.data());
   }
 
-  auto rc = thread_sp->GetRegisterContext();
-  if (!rc) {
-    LLDB_LOGF(log_category, "failed to get register context");
-    return {};
-  }
+  RegisterContextSP rc = thread_sp->GetRegisterContext();
+  if (!rc)
+    return LogFailedCSI("failed to get register context");
 
   // FIXME: LLDB should have an API that tells us for the current target if
   // `LLDB_REGNUM_GENERIC_ARG1` can be used.
   // https://github.com/llvm/llvm-project/issues/168602
   // Don't try for architectures where examining the first register won't
   // work.
-  auto process = thread_sp->GetProcess();
-  if (!process) {
-    LLDB_LOGF(log_category, "failed to get process");
-    return {};
-  }
+  ProcessSP process = thread_sp->GetProcess();
+  if (!process)
+    return LogFailedCSI("failed to get process");
+
   switch (process->GetTarget().GetArchitecture().GetCore()) {
   case ArchSpec::eCore_x86_32_i386:
   case ArchSpec::eCore_x86_32_i486:
   case ArchSpec::eCore_x86_32_i486sx:
-  case ArchSpec::eCore_x86_32_i686:
+  case ArchSpec::eCore_x86_32_i686: {
     // Technically some x86 calling conventions do use a register for
     // passing the first argument but let's ignore that for now.
-    Debugger::ReportWarning(
-        "specific BoundsSafety trap reason cannot be inferred on x86 when "
-        "the caller of '" BOUNDS_SAFETY_SOFT_TRAP_S "' is missing debug info",
-        debugger_id);
+    std::string warning;
+    llvm::raw_string_ostream ss(warning);
+    ss << "specific BoundsSafety trap reason cannot be inferred on x86 when "
+          "the caller of '"
+       << BoundsSafetySoftTrapStr << "' is missing debug info";
+    Debugger::ReportWarning(warning.c_str(), debugger_id);
     warning_emitted_for_failure = true;
     return {};
+  }
   default: {
   }
   };
 
-  // Examine the register for the first argument
-  auto *arg0_info = rc->GetRegisterInfo(
+  // Examine the register for the first argument.
+  const RegisterInfo *arg0_info = rc->GetRegisterInfo(
       lldb::RegisterKind::eRegisterKindGeneric, LLDB_REGNUM_GENERIC_ARG1);
-  if (!arg0_info) {
-    LLDB_LOGF(log_category,
-              "failed to get register info for LLDB_REGNUM_GENERIC_ARG1");
-    return {};
-  }
+  if (!arg0_info)
+    return LogFailedCSI(
+        "failed to get register info for LLDB_REGNUM_GENERIC_ARG1");
   RegisterValue reg_value;
-  if (!rc->ReadRegister(arg0_info, reg_value)) {
-    LLDB_LOGF(log_category, "failed to read register %s", arg0_info->name);
-    return {};
-  }
+  if (!rc->ReadRegister(arg0_info, reg_value))
+    return LogFailedCSI("failed to read register {0}", arg0_info->name);
   uint64_t reg_value_as_int = reg_value.GetAsUInt64(UINT64_MAX);
-  if (reg_value_as_int == UINT64_MAX) {
-    LLDB_LOGF(log_category, "failed to read register %s as a UInt64",
-              arg0_info->name);
-    return {};
-  }
+  if (reg_value_as_int == UINT64_MAX)
+    return LogFailedCSI("failed to read register {0} as a UInt64",
+                        arg0_info->name);
 
   if (reg_value_as_int == 0) {
     // nullptr arg. The compiler will pass that if no trap reason string was
@@ -317,13 +312,13 @@ InstrumentationBoundsSafetyStopInfo::
   Status error_status;
   thread_sp->GetProcess()->ReadCStringFromMemory(reg_value_as_int, out_string,
                                                  error_status);
-  if (error_status.Fail()) {
-    LLDB_LOGF(log_category, "failed to read C string from address %p",
-              (void *)reg_value_as_int);
-    return {};
-  }
-  LLDB_LOGF(log_category, "read C string from %p found in register %s: \"%s\"",
-            (void *)reg_value_as_int, arg0_info->name, out_string.c_str());
+  if (error_status.Fail())
+    return LogFailedCSI("failed to read C string from address {0}",
+                        (void *)reg_value_as_int);
+
+  LLDB_LOG(GetLog(LLDBLog::InstrumentationRuntime),
+           "read C string from {0} found in register {1}: \"{2}\"",
+           (void *)reg_value_as_int, arg0_info->name, out_string.c_str());
   std::string stop_reason;
   llvm::raw_string_ostream SS(stop_reason);
   SS << SOFT_TRAP_FALLBACK_CATEGORY;
@@ -331,7 +326,7 @@ InstrumentationBoundsSafetyStopInfo::
     SS << ": " << out_string;
   }
   // Use the current frame as the suggested frame for the same reason as for
-  // `BOUNDS_SAFETY_SOFT_TRAP_MINIMAL`.
+  // `__bounds_safety_soft_trap`.
   return {stop_reason, 0};
 }
 
@@ -369,20 +364,21 @@ InstrumentationRuntimeBoundsSafety::GetPatternForRuntimeLibrary() {
 
 bool InstrumentationRuntimeBoundsSafety::CheckIfRuntimeIsValid(
     const lldb::ModuleSP module_sp) {
-  auto *log_category = GetLog(LLDBLog::InstrumentationRuntime);
+  Log *log_category = GetLog(LLDBLog::InstrumentationRuntime);
   for (const auto &SoftTrapFunc : getBoundsSafetySoftTrapRuntimeFuncs()) {
     ConstString test_sym(SoftTrapFunc);
 
     if (module_sp->FindFirstSymbolWithNameAndType(test_sym,
                                                   lldb::eSymbolTypeAny)) {
-      LLDB_LOGF(log_category, "found \"%s\" in %s", SoftTrapFunc.c_str(),
-                module_sp->GetObjectName().AsCString("<unknown>"));
+      LLDB_LOG(log_category, "found \"{0}\" in {1}",
+               test_sym.AsCString("<unknown symbol>"),
+               module_sp->GetObjectName().AsCString("<unknown module>"));
       return true;
     }
   }
-  LLDB_LOGF(log_category,
-            "did not findFound BoundsSafety soft trap functions in %s",
-            module_sp->GetObjectName().AsCString("<unknown>"));
+  LLDB_LOG(log_category,
+           "did not find BoundsSafety soft trap functions in module {0}",
+           module_sp->GetObjectName().AsCString("<unknown module>"));
   return false;
 }
 
@@ -396,34 +392,26 @@ bool InstrumentationRuntimeBoundsSafety::NotifyBreakpointHit(
   InstrumentationRuntimeBoundsSafety *const instance =
       static_cast<InstrumentationRuntimeBoundsSafety *>(baton);
 
-  auto *log_category = GetLog(LLDBLog::InstrumentationRuntime);
   ProcessSP process_sp = instance->GetProcessSP();
-  if (!process_sp) {
-    LLDB_LOGF(log_category, "failed to get process from baton");
-    return false;
-  }
+  if (!process_sp)
+    return LogBeforeReturn<bool>("failed to get process from baton");
   ThreadSP thread_sp = context->exe_ctx_ref.GetThreadSP();
-  if (!thread_sp) {
-    LLDB_LOGF(log_category,
-              "failed to get thread from StoppointCallbackContext");
-    return false;
-  }
-  if (process_sp != context->exe_ctx_ref.GetProcessSP()) {
-    LLDB_LOGF(log_category,
-              "process from baton (%p) and StoppointCallbackContext (%p) do "
-              "not match",
-              (void *)process_sp.get(),
-              (void *)context->exe_ctx_ref.GetProcessSP().get());
-    return false;
-  }
+  if (!thread_sp)
+    return LogBeforeReturn<bool>(
+        "failed to get thread from StoppointCallbackContext");
 
-  if (process_sp->GetModIDRef().IsLastResumeForUserExpression()) {
-    LLDB_LOGF(log_category, "IsLastResumeForUserExpression is true");
-    return false;
-  }
+  if (process_sp != context->exe_ctx_ref.GetProcessSP())
+    return LogBeforeReturn<bool>(
+        "process from baton ({0}) and StoppointCallbackContext ({1}) do "
+        "not match",
+        (void *)process_sp.get(),
+        (void *)context->exe_ctx_ref.GetProcessSP().get());
+
+  if (process_sp->GetModIDRef().IsLastResumeForUserExpression())
+    return LogBeforeReturn<bool>("IsLastResumeForUserExpression is true");
 
   // Maybe the stop reason and stackframe selection should be done by
-  // a stackframe recognizer instead (rdar://165066642)?
+  // a stackframe recognizer instead?
   thread_sp->SetStopInfo(
       InstrumentationBoundsSafetyStopInfo::
           CreateInstrumentationBoundsSafetyStopInfo(*thread_sp));
@@ -434,32 +422,33 @@ void InstrumentationRuntimeBoundsSafety::Activate() {
   if (IsActive())
     return;
 
-  auto *log_category = GetLog(LLDBLog::InstrumentationRuntime);
   ProcessSP process_sp = GetProcessSP();
-  if (!process_sp) {
-    LLDB_LOGF(log_category, "could not get process during Activate()");
-    return;
-  }
+  if (!process_sp)
+    return LogBeforeReturn<void>("could not get process during Activate()");
 
-  auto breakpoint = process_sp->GetTarget().CreateBreakpoint(
+  std::vector<std::string> breakpoints;
+  for (auto &breakpoint_func : getBoundsSafetySoftTrapRuntimeFuncs())
+    breakpoints.emplace_back(breakpoint_func);
+
+  BreakpointSP breakpoint = process_sp->GetTarget().CreateBreakpoint(
       /*containingModules=*/nullptr,
-      /*containingSourceFiles=*/nullptr, getBoundsSafetySoftTrapRuntimeFuncs(),
-      eFunctionNameTypeFull, eLanguageTypeUnknown,
+      /*containingSourceFiles=*/nullptr, breakpoints, eFunctionNameTypeFull,
+      eLanguageTypeUnknown,
       /*m_offset=*/0,
       /*skip_prologue*/ eLazyBoolNo,
       /*internal=*/true,
       /*request_hardware*/ false);
 
   if (!breakpoint)
-    return;
+    return LogBeforeReturn<void>("failed to create breakpoint");
+
   if (!breakpoint->HasResolvedLocations()) {
-    LLDB_LOGF(log_category,
-              "breakpoint %d for BoundsSafety soft traps did not resolve to "
-              "any locations",
-              breakpoint->GetID());
     assert(0 && "breakpoint has no resolved locations");
     process_sp->GetTarget().RemoveBreakpointByID(breakpoint->GetID());
-    return;
+    return LogBeforeReturn<void>(
+        "breakpoint {0} for BoundsSafety soft traps did not resolve to "
+        "any locations",
+        breakpoint->GetID());
   }
 
   // Note: When `sync=true` the suggested stackframe is completely ignored. So
@@ -469,22 +458,23 @@ void InstrumentationRuntimeBoundsSafety::Activate() {
       /*sync=*/false);
   breakpoint->SetBreakpointKind("bounds-safety-soft-trap");
   SetBreakpointID(breakpoint->GetID());
-  LLDB_LOGF(log_category, "created breakpoint %d for BoundsSafety soft traps",
-            breakpoint->GetID());
+  LLDB_LOG(GetLog(LLDBLog::InstrumentationRuntime),
+           "created breakpoint {0} for BoundsSafety soft traps",
+           breakpoint->GetID());
   SetActive(true);
 }
 
 void InstrumentationRuntimeBoundsSafety::Deactivate() {
   SetActive(false);
-  auto *log_category = GetLog(LLDBLog::InstrumentationRuntime);
+  Log *log_category = GetLog(LLDBLog::InstrumentationRuntime);
   if (ProcessSP process_sp = GetProcessSP()) {
     bool success =
         process_sp->GetTarget().RemoveBreakpointByID(GetBreakpointID());
-    LLDB_LOGF(log_category,
-              "%sremoved breakpoint %llu for BoundsSafety soft traps",
-              success ? "" : "failed to ", GetBreakpointID());
+    LLDB_LOG(log_category,
+             "{0}removed breakpoint {1} for BoundsSafety soft traps",
+             success ? "" : "failed to ", GetBreakpointID());
   } else {
-    LLDB_LOGF(log_category, "no process available during Deactivate()");
+    LLDB_LOG(log_category, "no process available during Deactivate()");
   }
 
   SetBreakpointID(LLDB_INVALID_BREAK_ID);
