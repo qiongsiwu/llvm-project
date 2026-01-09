@@ -18,6 +18,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Locale.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <algorithm>
 #include <optional>
 
@@ -738,9 +740,7 @@ void TextDiagnostic::printDiagnosticMessage(raw_ostream &OS,
 }
 
 void TextDiagnostic::emitFilename(StringRef Filename, const SourceManager &SM) {
-#ifdef _WIN32
-  SmallString<4096> TmpFilename;
-#endif
+  SmallString<256> TmpFilename;
   if (DiagOpts.AbsolutePath) {
     auto File = SM.getFileManager().getOptionalFileRef(Filename);
     if (File) {
@@ -767,6 +767,17 @@ void TextDiagnostic::emitFilename(StringRef Filename, const SourceManager &SM) {
 #else
       Filename = SM.getFileManager().getCanonicalName(*File);
 #endif
+    }
+
+    // TO_UPSTREAM(CAS)
+    if (DiagOpts.FallbackRealFileSystemAbsolutePaths && !Filename.empty() &&
+        !llvm::sys::path::is_absolute(Filename)) {
+      // When caching, the above may fail to canonicalize due to using the
+      // IncludeTreeFileSystem. In that case, we can safely fallback to the real
+      // filesytem since the text diagnostic output is not captured directly.
+      auto FS = llvm::vfs::getRealFileSystem();
+      if (FS->getRealPath(Filename, TmpFilename) == std::error_code())
+        Filename = TmpFilename;
     }
   }
 
