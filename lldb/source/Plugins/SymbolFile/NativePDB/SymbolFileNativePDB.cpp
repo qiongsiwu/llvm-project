@@ -1913,7 +1913,7 @@ TypeSP SymbolFileNativePDB::CreateTypedef(PdbGlobalSymId id) {
   if (!ts)
     return nullptr;
 
-  ts->GetNativePDBParser()->GetOrCreateTypedefDecl(id);
+  ts->GetNativePDBParser()->GetOrCreateTypedefType(id);
 
   Declaration decl;
   return MakeType(toOpaqueUid(id), ConstString(udt.Name),
