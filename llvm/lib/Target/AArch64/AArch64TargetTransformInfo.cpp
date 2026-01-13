@@ -4275,10 +4275,18 @@ AArch64TTIImpl::getAddressComputationCost(Type *Ty, ScalarEvolution *SE,
   unsigned NumVectorInstToHideOverhead = NeonNonConstStrideOverhead;
   int MaxMergeDistance = 64;
 
-  if (Ty->isVectorTy() && SE &&
-      !BaseT::isConstantStridedAccessLessThan(SE, Ptr, MaxMergeDistance + 1))
-    return NumVectorInstToHideOverhead;
+  if (Ty->isVectorTy() && SE) {
+    if (BaseT::isConstantStridedAccessLessThan(SE, Ptr, MaxMergeDistance + 1))
+      return 1;
 
+    // TODO: Remove restriction for 2 element vectors.
+    if (cast<VectorType>(Ty)->getElementCount().getKnownMinValue() == 2 &&
+        isa_and_nonnull<SCEVAddRecExpr>(Ptr) &&
+        isa<SCEVConstant>(cast<SCEVAddRecExpr>(Ptr)->getStepRecurrence(*SE)))
+      return 1;
+
+    return NumVectorInstToHideOverhead;
+  }
   // In many cases the address computation is not merged into the instruction
   // addressing mode.
   return 1;
