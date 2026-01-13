@@ -7053,20 +7053,7 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
     }
   }
 
-  // Return true if the loop contains any instructions that are not also part of
-  // the VPlan or are skipped for VPlan-based cost computations. This indicates
-  // that the VPlan contains extra simplifications.
-  return any_of(TheLoop->blocks(), [&SeenInstrs, &CostCtx,
-                                    TheLoop](BasicBlock *BB) {
-    return any_of(*BB, [&SeenInstrs, &CostCtx, TheLoop, BB](Instruction &I) {
-      // Skip induction phis when checking for simplifications, as they may not
-      // be lowered directly be lowered to a corresponding PHI recipe.
-      if (isa<PHINode>(&I) && BB == TheLoop->getHeader() &&
-          CostCtx.CM.Legal->isInductionPhi(cast<PHINode>(&I)))
-        return false;
-      return !SeenInstrs.contains(&I) && !CostCtx.skipCostComputation(&I, true);
-    });
-  });
+  return true;
 }
 #endif
 
@@ -8432,7 +8419,6 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
       bool HasScalarVF = Plan->hasScalarVFOnly();
       // Now optimize the initial VPlan.
       VPlanTransforms::hoistPredicatedLoads(*Plan, PSE, OrigLoop);
-      VPlanTransforms::sinkPredicatedStores(*Plan, PSE, OrigLoop);
       if (!HasScalarVF)
         VPlanTransforms::runPass(VPlanTransforms::truncateToMinimalBitwidths,
                                  *Plan, CM.getMinimalBitwidths());
