@@ -323,6 +323,10 @@ public:
       ArrayRef<ArrayRef<uint8_t>>, ArrayRef<char>, SmallVectorImpl<uint8_t> &)>;
   Error validate(bool Deep, HashingFuncT Hasher) const;
 
+  /// Checks that \p ID exists in the index. It is allowed to not have data
+  /// associated with it.
+  LLVM_ABI_FOR_TEST Error validateObjectID(ObjectID ID);
+
   /// How to fault-in nodes if an upstream database is used.
   enum class FaultInPolicy {
     /// Copy only the requested node.

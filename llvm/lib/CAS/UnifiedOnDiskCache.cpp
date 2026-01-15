@@ -158,31 +158,17 @@ UnifiedOnDiskCache::faultInFromUpstreamKV(ArrayRef<uint8_t> Key) {
 }
 
 Error UnifiedOnDiskCache::validateActionCache() {
-  auto ValidateRef = [&](FileOffset Offset, ArrayRef<char> Value) -> Error {
-    assert(Value.size() == sizeof(uint64_t) && "should be validated already");
+  auto ValidateRef = [this](FileOffset Offset, ArrayRef<char> Value) -> Error {
     auto ID = ObjectID::fromOpaqueData(support::endian::read64le(Value.data()));
     auto formatError = [&](Twine Msg) {
       return createStringError(
           llvm::errc::illegal_byte_sequence,
           "bad record at 0x" +
-              utohexstr((unsigned)Offset.get(), /*LowerCase=*/true) +
-              " ref=0x" + utohexstr(ID.getOpaqueData(), /*LowerCase=*/true) +
-              ": " + Msg.str());
+              utohexstr((unsigned)Offset.get(), /*LowerCase=*/true) + ": " +
+              Msg.str());
     };
-    if (ID.getOpaqueData() == 0)
-      return formatError("zero is not a valid ref");
-    // Check containsObject first, because other API assumes a valid ObjectID.
-    if (!getGraphDB().containsObject(ID, /*CheckUpstream=*/false))
-      return formatError("ref is not in cas index");
-    auto Hash = getGraphDB().getDigest(ID);
-    auto Ref = getGraphDB().getExistingReference(Hash, /*CheckUpstream=*/false);
-    assert(Ref && "missing object passed containsObject check?");
-    if (!Ref)
-      return formatError("ref is not in cas index after contains");
-    if (*Ref != ID)
-      return formatError("ref does not match indexed offset " +
-                         utohexstr(Ref->getOpaqueData(), /*LowerCase=*/true) +
-                         " for hash " + toHex(Hash));
+    if (Error E = getGraphDB().validateObjectID(ID))
+      return formatError(llvm::toString(std::move(E)));
     return Error::success();
   };
   if (Error E = PrimaryKVDB->validate(ValidateRef))
