@@ -323,6 +323,8 @@ StringRef Triple::getOSTypeName(OSType Kind) {
   case LiteOS: return "liteos";
   case XROS: return "xros";
   case Vulkan: return "vulkan";
+  case Firmware:
+    return "firmware";
   }
 
   llvm_unreachable("Invalid OSType");
@@ -719,6 +721,7 @@ static Triple::OSType parseOS(StringRef OSName) {
     .StartsWith("liteos", Triple::LiteOS)
     .StartsWith("serenity", Triple::Serenity)
     .StartsWith("vulkan", Triple::Vulkan)
+    .StartsWith("firmware", Triple::Firmware)
     .Default(Triple::UnknownOS);
 }
 
@@ -1344,6 +1347,12 @@ std::string Triple::normalize(StringRef Str, CanonicalForm Form) {
     }
   }
 
+  // Currently the firmware OS is an Apple specific concept.
+  if ((Components.size() > 2) && (Components[2] == "firmware") &&
+      (Components[1] != "apple"))
+    llvm::reportFatalUsageError(
+        "the firmware target os is only supported for the apple vendor");
+
   // Canonicalize the components if necessary.
   switch (Form) {
   case CanonicalForm::ANY:
@@ -1477,6 +1486,8 @@ bool Triple::getMacOSXVersion(VersionTuple &Version) const {
     llvm_unreachable("OSX version isn't relevant for xrOS");
   case DriverKit:
     llvm_unreachable("OSX version isn't relevant for DriverKit");
+  case Firmware:
+    llvm_unreachable("OSX version isn't relevant for Firmware");
   }
   return true;
 }
@@ -1527,6 +1538,8 @@ VersionTuple Triple::getiOSVersion() const {
     llvm_unreachable("conflicting triple info");
   case DriverKit:
     llvm_unreachable("DriverKit doesn't have an iOS version");
+  case Firmware:
+    llvm_unreachable("iOS version isn't relevant for Firmware");
   }
 }
 
@@ -1552,6 +1565,8 @@ VersionTuple Triple::getWatchOSVersion() const {
     llvm_unreachable("watchOS version isn't relevant for xrOS");
   case DriverKit:
     llvm_unreachable("DriverKit doesn't have a WatchOS version");
+  case Firmware:
+    llvm_unreachable("watchOS version isn't relevant for Firmware");
   }
 }
 
