@@ -1,3 +1,4 @@
+// UNSUPPORTED: target={{.*linux.*}}
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: cd %t
