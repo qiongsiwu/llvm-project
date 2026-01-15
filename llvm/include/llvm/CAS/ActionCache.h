@@ -33,7 +33,7 @@ public:
   // To do that, ActionCache need to be able to rehash the key into the index,
   // which then `getOrCompute` method can be used to avoid multiple calls to
   // has function.
-  CacheKey(const CASID &ID);
+  LLVM_ABI CacheKey(const CASID &ID);
   LLVM_ABI_FOR_TEST CacheKey(const ObjectProxy &Proxy);
   CacheKey(const ObjectStore &CAS, const ObjectRef &Ref);
 
