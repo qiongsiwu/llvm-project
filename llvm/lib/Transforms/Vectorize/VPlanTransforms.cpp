@@ -1213,7 +1213,7 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
   // select c, false, true -> not c
   VPValue *C;
   if (match(Def, m_Select(m_VPValue(C), m_False(), m_True())))
-    return Def->replaceAllUsesWith(Builder.createNot(C));
+    return Def->replaceAllUsesWith(VPBuilder(Def).createNot(C));
 
   // select !c, x, y -> select c, y, x
   if (match(Def, m_Select(m_Not(m_VPValue(C)), m_VPValue(X), m_VPValue(Y)))) {
