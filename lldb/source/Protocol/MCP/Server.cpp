@@ -8,6 +8,7 @@
 
 #include "lldb/Protocol/MCP/Server.h"
 #include "lldb/Protocol/MCP/MCPError.h"
+#include "llvm/Support/ErrorExtras.h"
 
 using namespace lldb_protocol::mcp;
 using namespace llvm;
