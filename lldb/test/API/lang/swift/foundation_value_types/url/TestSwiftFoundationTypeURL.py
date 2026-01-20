@@ -22,6 +22,7 @@ import lldbsuite.test.lldbutil as lldbutil
 
 
 class TestCase(TestBase):
+    @expectedFailureAll(archs=["arm64_32"], bugnumber="<rdar://problem/58065423>")
     @skipUnlessFoundation
     @swiftTest
     def test_swift_url_formatters(self):
