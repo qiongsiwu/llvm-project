@@ -71,10 +71,7 @@ public:
 
   void ParseDeclsForContext(CompilerDeclContext context) override;
 
-  CompilerDeclContext FindNamespaceDecl(CompilerDeclContext parent_ctx,
-                                        llvm::StringRef name) override;
-
-  void Dump(Stream &stream, llvm::StringRef filter, bool show_color) override;
+  void Dump(Stream &stream, llvm::StringRef filter) override;
 
   // Clang-specific
   clang::QualType GetBasicType(lldb::BasicType type);
@@ -170,10 +167,6 @@ private:
 
   // These namespaces are fully parsed
   NamespaceSet m_parsed_namespaces;
-
-  // We know about these namespaces, but they might not be completely parsed yet
-  NamespaceSet m_known_namespaces;
-  llvm::DenseMap<clang::DeclContext *, NamespaceSet> m_parent_to_namespaces;
 };
 
 } // namespace npdb
