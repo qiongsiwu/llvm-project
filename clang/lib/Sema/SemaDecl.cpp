@@ -19241,7 +19241,8 @@ Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK, SourceLocation KWLoc,
               // ensure the decl passes the structural compatibility check in
               // C11 6.2.7/1 (or 6.1.2.6/1 in C89).
               NamedDecl *Hidden = nullptr;
-              if (SkipBody && !hasVisibleDefinition(Def, &Hidden)) {
+              if (SkipBody &&
+                  (!hasVisibleDefinition(Def, &Hidden) || getLangOpts().C23)) {
                 // There is a definition of this tag, but it is not visible. We
                 // explicitly make use of C++'s one definition rule here, and
                 // assume that this definition is identical to the hidden one
@@ -19254,6 +19255,8 @@ Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK, SourceLocation KWLoc,
                   SkipBody->CheckSameAsPrevious = true;
                   SkipBody->New = createTagFromNewDecl();
                   SkipBody->Previous = Def;
+
+                  ProcessDeclAttributeList(S, SkipBody->New, Attrs);
                   return Def;
                 } else {
                   SkipBody->ShouldSkip = true;
@@ -19527,7 +19530,10 @@ CreateNewDecl:
 
   // If we're declaring or defining a tag in function prototype scope in C,
   // note that this type can only be used within the function and add it to
-  // the list of decls to inject into the function definition scope.
+  // the list of decls to inject into the function definition scope. However,
+  // in C23 and later, while the type is only visible within the function, the
+  // function can be called with a compatible type defined in the same TU, so
+  // we silence the diagnostic in C23 and up. This matches the behavior of GCC.
   if ((Name || Kind == TagTypeKind::Enum) &&
       getNonFieldDeclScope(S)->isFunctionPrototypeScope()) {
     if (getLangOpts().CPlusPlus) {
@@ -19541,7 +19547,10 @@ CreateNewDecl:
       if (TUK == TagUseKind::Declaration)
         Invalid = true;
     } else if (!PrevDecl) {
-      Diag(Loc, diag::warn_decl_in_param_list) << Context.getTagDeclType(New);
+      // In C23 mode, if the declaration is complete, we do not want to
+      // diagnose.
+      if (!getLangOpts().C23 || TUK != TagUseKind::Definition)
+        Diag(Loc, diag::warn_decl_in_param_list) << Context.getTagDeclType(New);
     }
   }
 
@@ -21287,7 +21296,8 @@ SkipBodyInfo Sema::shouldSkipAnonEnumBody(Scope *S, IdentifierInfo *II,
 Decl *Sema::ActOnEnumConstant(Scope *S, Decl *theEnumDecl, Decl *lastEnumConst,
                               SourceLocation IdLoc, IdentifierInfo *Id,
                               const ParsedAttributesView &Attrs,
-                              SourceLocation EqualLoc, Expr *Val) {
+                              SourceLocation EqualLoc, Expr *Val,
+                              SkipBodyInfo *SkipBody) {
   EnumDecl *TheEnumDecl = cast<EnumDecl>(theEnumDecl);
   EnumConstantDecl *LastEnumConst =
     cast_or_null<EnumConstantDecl>(lastEnumConst);
@@ -21324,7 +21334,7 @@ Decl *Sema::ActOnEnumConstant(Scope *S, Decl *theEnumDecl, Decl *lastEnumConst,
   if (!New)
     return nullptr;
 
-  if (PrevDecl) {
+  if (PrevDecl && (!SkipBody || !SkipBody->CheckSameAsPrevious)) {
     if (!TheEnumDecl->isScoped() && isa<ValueDecl>(PrevDecl)) {
       // Check for other kinds of shadowing not already handled.
       CheckShadow(New, PrevDecl, R);
