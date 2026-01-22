@@ -1645,6 +1645,14 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
         assert(!emission.useLifetimeMarkers());
       }
     }
+
+    if (D.hasAttr<StackProtectorIgnoreAttr>()) {
+      if (auto *AI = dyn_cast<llvm::AllocaInst>(address.getBasePointer())) {
+        llvm::LLVMContext &Ctx = Builder.getContext();
+        auto *Operand = llvm::ConstantAsMetadata::get(Builder.getInt32(0));
+        AI->setMetadata("stack-protector", llvm::MDNode::get(Ctx, {Operand}));
+      }
+    }
   } else {
     EnsureInsertPoint();
 
