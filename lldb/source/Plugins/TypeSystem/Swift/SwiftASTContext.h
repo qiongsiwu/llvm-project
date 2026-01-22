@@ -86,6 +86,7 @@ class LLVMContext;
 class SwiftEnumDescriptor;
 
 namespace lldb_private {
+class LLDBExplicitSwiftModuleLoader;
 
 namespace plugin {
 namespace dwarf {
@@ -570,6 +571,7 @@ public:
   void LogConfiguration(bool repl = false, bool playground = false);
   bool HasTarget();
   bool HasExplicitModules() const { return m_has_explicit_modules; }
+  bool ImplicitModulesDisabled() const { return m_implicit_modules_disabled; }
   bool HasCAS() const { return m_cas_initialized; }
   bool CheckProcessChanged();
 
@@ -1019,6 +1021,7 @@ protected:
   bool m_initialized_search_path_options = false;
   bool m_initialized_clang_importer_options = false;
   bool m_has_explicit_modules = false;
+  bool m_implicit_modules_disabled = false;
   bool m_cas_initialized = false;
   mutable bool m_reported_fatal_error = false;
   mutable bool m_logged_fatal_error = false;
