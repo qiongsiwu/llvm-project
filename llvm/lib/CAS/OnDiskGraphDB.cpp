@@ -1011,7 +1011,7 @@ Error OnDiskGraphDB::validate(bool Deep, HashingFuncT Hasher) const {
   });
 }
 
-Error OnDiskGraphDB::validateObjectID(ObjectID ExternalRef) {
+Error OnDiskGraphDB::validateObjectID(ObjectID ExternalRef) const {
   auto formatError = [&](Twine Msg) {
     return createStringError(
         llvm::errc::illegal_byte_sequence,

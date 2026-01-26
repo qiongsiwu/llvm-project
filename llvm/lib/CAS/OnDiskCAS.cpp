@@ -8,7 +8,6 @@
 
 #include "BuiltinCAS.h"
 #include "llvm/CAS/BuiltinCASContext.h"
-#include "llvm/CAS/BuiltinObjectHasher.h"
 #include "llvm/CAS/OnDiskCASLogger.h"
 #include "llvm/CAS/OnDiskGraphDB.h"
 #include "llvm/CAS/UnifiedOnDiskCache.h"
@@ -90,17 +89,11 @@ private:
 
 void OnDiskCAS::print(raw_ostream &OS) const { DB->print(OS); }
 Error OnDiskCAS::validate(bool CheckHash) const {
-  auto Hasher = [](ArrayRef<ArrayRef<uint8_t>> Refs, ArrayRef<char> Data,
-                   SmallVectorImpl<uint8_t> &Result) {
-    auto Hash = BuiltinObjectHasher<llvm::cas::builtin::HasherT>::hashObject(
-        Refs, Data);
-    Result.assign(Hash.begin(), Hash.end());
-  };
-
-  if (auto E = DB->validate(CheckHash, Hasher))
+  if (auto E = DB->validate(CheckHash, builtin::hashingFunc))
     return E;
   if (UniDB && UniDB->getUpstreamGraphDB())
-    return UniDB->getUpstreamGraphDB()->validate(CheckHash, Hasher);
+    return UniDB->getUpstreamGraphDB()->validate(CheckHash,
+                                                 builtin::hashingFunc);
 
   return Error::success();
 }
