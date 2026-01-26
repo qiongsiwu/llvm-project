@@ -88,6 +88,7 @@ class LLVMContext;
 class SwiftEnumDescriptor;
 
 namespace lldb_private {
+class LLDBExplicitSwiftModuleLoader;
 
 namespace plugin {
 namespace dwarf {
@@ -372,11 +373,10 @@ public:
   /// by module, load the module into the AST context, and (if import_dylib is
   /// set) also load any "LinkLibraries" that the module requires.
   template <typename ModuleT>
-  swift::ModuleDecl *FindAndLoadModule(const ModuleT &module, Process &process,
-                                       bool import_dylib, Status &error);
+  llvm::Expected<swift::ModuleDecl &>
+  FindAndLoadModule(const ModuleT &module, Process &process, bool import_dylib);
 
-  void LoadModule(swift::ModuleDecl *swift_module, Process &process,
-                  Status &error);
+  llvm::Error LoadModule(swift::ModuleDecl &swift_module, Process &process);
 
   /// Collect Swift modules in the .swift_ast section of \p module.
   void RegisterSectionModules(Module &module,
@@ -575,6 +575,7 @@ public:
   void LogConfiguration(bool repl = false, bool playground = false);
   bool HasTarget();
   bool HasExplicitModules() const { return m_has_explicit_modules; }
+  bool ImplicitModulesDisabled() const { return m_implicit_modules_disabled; }
   bool HasCAS() const { return m_cas_initialized; }
   bool CheckProcessChanged();
 
@@ -882,15 +883,14 @@ public:
 
   /// Retrieve/import the modules imported by the compilation
   /// unit. Early-exists with false if there was an import failure.
-  bool GetCompileUnitImports(
+  llvm::Error GetCompileUnitImports(
       const SymbolContext &sc, lldb::ProcessSP process_sp,
       llvm::SmallVectorImpl<swift::AttributedImport<swift::ImportedModule>>
-          &modules,
-      Status &error);
+          &modules);
 
   /// Perform all the implicit imports for the current frame.
-  void PerformCompileUnitImports(const SymbolContext &sc, lldb::ProcessSP process_sp,
-                                 Status &error);
+  llvm::Error PerformCompileUnitImports(const SymbolContext &sc,
+                                        lldb::ProcessSP process_sp);
 
   /// Returns the mangling flavor associated with this ASTContext.
   swift::Mangle::ManglingFlavor GetManglingFlavor();
@@ -900,11 +900,10 @@ protected:
   /// configuration file.
   void ConfigureCASStorage(const SymbolContext &sc);
 
-  bool GetCompileUnitImportsImpl(
+  llvm::Error GetCompileUnitImportsImpl(
       const SymbolContext &sc, lldb::ProcessSP process_sp,
       llvm::SmallVectorImpl<swift::AttributedImport<swift::ImportedModule>>
-          *modules,
-      Status &error);
+          *modules);
 
   /// This map uses the string value of ConstStrings as the key, and the
   /// TypeBase
@@ -1026,6 +1025,7 @@ protected:
   bool m_initialized_search_path_options = false;
   bool m_initialized_clang_importer_options = false;
   bool m_has_explicit_modules = false;
+  bool m_implicit_modules_disabled = false;
   bool m_cas_initialized = false;
   mutable bool m_reported_fatal_error = false;
   mutable bool m_logged_fatal_error = false;
@@ -1119,22 +1119,21 @@ public:
   /// Retrieves the modules that need to be implicitly imported in a given
   /// execution scope. This includes the modules imported by both the compile
   /// unit as well as any imports from previous expression evaluations.
-  bool GetImplicitImports(
+  llvm::Error GetImplicitImports(
       SymbolContext &sc, lldb::ProcessSP process_sp,
       llvm::SmallVectorImpl<swift::AttributedImport<swift::ImportedModule>>
-          &modules,
-      Status &error);
+          &modules);
 
   // FIXME: the correct thing to do would be to get the modules by calling
   // CompilerInstance::getImplicitImportInfo, instead of loading these
   // modules manually. However, we currently don't have  access to a
   // CompilerInstance, which is why this function is needed.
-  void LoadImplicitModules(lldb::TargetSP target, lldb::ProcessSP process,
-                           ExecutionContextScope &exe_scope);
+  llvm::Error LoadImplicitModules(lldb::ProcessSP process,
+                                  ExecutionContextScope &exe_scope);
   /// Cache the user's imports from a SourceFile in a given execution scope such
   /// that they are carried over into future expression evaluations.
-  bool CacheUserImports(lldb::ProcessSP process_sp,
-                        swift::SourceFile &source_file, Status &error);
+  llvm::Error CacheUserImports(lldb::ProcessSP process_sp,
+                               swift::SourceFile &source_file);
 
 protected:
   /// These are the names of modules that we have loaded by hand into

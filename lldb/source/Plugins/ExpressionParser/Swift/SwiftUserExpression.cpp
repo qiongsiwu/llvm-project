@@ -16,13 +16,6 @@
 #include "SwiftPersistentExpressionState.h"
 #include "SwiftREPLMaterializer.h"
 
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/Demangling/Demangler.h"
-#if HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-
 #include "Plugins/LanguageRuntime/Swift/SwiftLanguageRuntime.h"
 #include "lldb/Core/Debugger.h"
 #include "lldb/Core/Module.h"
@@ -39,17 +32,23 @@
 #include "lldb/Utility/LLDBAssert.h"
 #include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
+#include "lldb/Utility/Status.h"
 #include "lldb/Utility/Timer.h"
+#include "lldb/ValueObject/ValueObject.h"
+#include "lldb/lldb-enumerations.h"
 
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 
 #include <map>
 #include <string>
+#if HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
 
 #include "SwiftUserExpression.h"
 
@@ -408,6 +407,17 @@ static llvm::Error AddVariableInfo(
                   static_cast<void *>(swift_type.getPointer()),
                   static_cast<void *>(*ast_context.GetASTContext()), s.c_str());
     }
+
+  // Stash diagnostics for missing locations.
+  Status variable_status;
+  if (lldb::ValueObjectSP valobj_sp =
+          stack_frame_sp->GetValueObjectForFrameVariable(
+              variable_sp, lldb::eNoDynamicValues)) {
+    variable_status = valobj_sp->GetError().Clone();
+    if (variable_status.Fail() && variable_sp->IsArtificial())
+      return llvm::Error::success();
+  }
+
   // A one-off clone of variable_sp with the type replaced by target_type.
   auto patched_variable_sp = std::make_shared<lldb_private::Variable>(
       0, variable_sp->GetName().GetCString(), "",
@@ -435,6 +445,9 @@ static llvm::Error AddVariableInfo(
       variable_sp->IsConstant() ? swift::VarDecl::Introducer::Let
                                 : swift::VarDecl::Introducer::Var,
       false, is_unbound_pack);
+  if (variable_status.Fail())
+    local_variables.back().SetLookupError(variable_status.takeError());
+
   processed_variables.insert(overridden_name);
   return llvm::Error::success();
 }
@@ -761,16 +774,23 @@ bool SwiftUserExpression::Parse(DiagnosticManager &diagnostic_manager,
   Log *log = GetLog(LLDBLog::Expressions);
   Status err;
 
-  auto error = [&](const char *error_msg, const char *detail = nullptr) {
+  auto diagnose = [&](const char *error_msg, const char *detail,
+                      lldb::Severity severity) -> bool {
     if (detail)
       LLDB_LOG(log, "{0}: {1}", error_msg, detail);
     else
       LLDB_LOG(log, error_msg);
 
-    diagnostic_manager.PutString(lldb::eSeverityError, error_msg);
+    diagnostic_manager.PutString(severity, error_msg);
     if (detail)
       diagnostic_manager.AppendMessageToDiagnostic(detail);
     return false;
+  };
+  auto error = [&](const char *error_msg, const char *detail = nullptr) {
+    return diagnose(error_msg, detail, lldb::eSeverityError);
+  };
+  auto note = [&](const char *error_msg, const char *detail = nullptr) {
+    return diagnose(error_msg, detail, lldb::eSeverityInfo);
   };
 
   InstallContext(exe_ctx);
@@ -823,12 +843,12 @@ bool SwiftUserExpression::Parse(DiagnosticManager &diagnostic_manager,
 
   if (!m_swift_ast_ctx)
     return error("could not initialize Swift compiler",
-                 "run 'swift-healthcheck' for more details");
+                 "run \"swift-healthcheck\" for more details");
 
   if (m_swift_ast_ctx->HasFatalErrors()) {
     m_swift_ast_ctx->PrintDiagnostics(diagnostic_manager);
-    return error("Swift AST context is in a fatal error state",
-                 "run 'swift-healthcheck' for more details");
+    return note("Swift AST context is in a fatal error state, run "
+                "\"swift-healthcheck\" for more details");
   }
   
   // This may destroy the scratch context.

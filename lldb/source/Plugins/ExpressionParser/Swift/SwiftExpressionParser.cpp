@@ -460,7 +460,7 @@ static CompilerType GetSwiftTypeForVariableValueObject(
     lldb::ValueObjectSP valobj_sp, lldb::StackFrameSP &stack_frame_sp,
     SwiftLanguageRuntime *runtime, lldb::BindGenericTypes bind_generic_types) {
   // Check that the passed ValueObject is valid.
-  if (!valobj_sp || valobj_sp->GetError().Fail())
+  if (!valobj_sp)
     return {};
   CompilerType result = valobj_sp->GetCompilerType();
   if (!result)
@@ -803,7 +803,8 @@ SwiftExpressionParser::GetASTContext(DiagnosticManager &diagnostic_manager) {
 
     if (m_swift_ast_ctx.HasFatalErrors()) {
       diagnostic_manager.PutString(
-          eSeverityError, "The AST context is in a fatal error state.");
+          eSeverityError,
+          llvm::toString(m_swift_ast_ctx.GetFatalErrors().takeError()));
       return;
     }
 
@@ -817,7 +818,8 @@ SwiftExpressionParser::GetASTContext(DiagnosticManager &diagnostic_manager) {
 
     if (m_swift_ast_ctx.HasFatalErrors()) {
       diagnostic_manager.PutString(
-          eSeverityError, "The AST context is in a fatal error state.");
+          eSeverityError,
+          llvm::toString(m_swift_ast_ctx.GetFatalErrors().takeError()));
       return;
     }
 
@@ -1310,21 +1312,21 @@ SwiftExpressionParser::ParseAndImport(
   // Gather the modules that need to be implicitly imported.
   // The Swift stdlib needs to be imported before the SwiftLanguageRuntime can
   // be used.
-  Status implicit_import_error;
   llvm::SmallVector<swift::AttributedImport<swift::ImportedModule>, 16>
       additional_imports;
   lldb::ProcessSP process_sp;
   if (lldb::StackFrameSP this_frame_sp = m_stack_frame_wp.lock())
     process_sp = this_frame_sp->CalculateProcess();
-  m_swift_ast_ctx.LoadImplicitModules(m_sc.target_sp, process_sp, *m_exe_scope);
+  if (!m_swift_ast_ctx.GetASTContext()->LangOpts.hasFeature(
+          swift::Feature::Embedded))
+    if (llvm::Error error =
+            m_swift_ast_ctx.LoadImplicitModules(process_sp, *m_exe_scope))
+      return make_error<ModuleImportError>(llvm::toString(std::move(error)));
+
   if (!m_options.GetUseContextFreeSwiftPrintObject())
-    if (!m_swift_ast_ctx.GetImplicitImports(
-            m_sc, process_sp, additional_imports, implicit_import_error)) {
-      const char *msg = implicit_import_error.AsCString();
-      if (!msg)
-        msg = "error status positive, but import still failed";
-      return make_error<ModuleImportError>(msg);
-    }
+    if (llvm::Error error = m_swift_ast_ctx.GetImplicitImports(
+            m_sc, process_sp, additional_imports))
+      return make_error<ModuleImportError>(llvm::toString(std::move(error)));
 
   swift::ImplicitImportInfo importInfo;
   importInfo.StdlibKind = swift::ImplicitStdlibKind::Stdlib;
@@ -1491,18 +1493,19 @@ SwiftExpressionParser::ParseAndImport(
         IRExecutionUnit::GetLLVMGlobalContextMutex());
 
     Status auto_import_error;
-    if (!m_swift_ast_ctx.CacheUserImports(process_sp, *source_file,
-                                          auto_import_error)) {
-      const char *msg = auto_import_error.AsCString();
-      if (!msg) {
-        // The import itself succeeded, but the AST context is in a
-        // fatal error state. One way this can happen is if the import
-        // triggered a dylib import, in which case the context is
-        // purposefully poisoned.
-        msg = "import may have triggered a dylib import, "
-              "resetting compiler state";
-      }
-      return make_error<ModuleImportError>(msg, /*is_new_dylib=*/true);
+    if (llvm::Error error =
+            m_swift_ast_ctx.CacheUserImports(process_sp, *source_file))
+      return make_error<ModuleImportError>(llvm::toString(std::move(error)),
+                                           /*is_new_dylib=*/true);
+    if (m_swift_ast_ctx.HasFatalErrors()) {
+      // The import itself succeeded, but the AST context is in a
+      // fatal error state. One way this can happen is if the import
+      // triggered a dylib import, in which case the context is
+      // purposefully poisoned.
+      return make_error<ModuleImportError>(
+          "import may have triggered a dylib import, "
+          "resetting compiler state",
+          /*is_new_dylib=*/true);
     }
   }
 
@@ -1859,16 +1862,19 @@ SwiftExpressionParser::Parse(DiagnosticManager &diagnostic_manager,
 
   if (expr_diagnostics->HasErrors()) {
     // Missing debug info for a variable could cause a spurious lookup error.
-    for (auto &var : m_local_variables) {
+    for (SwiftASTManipulator::VariableInfo &var : m_local_variables) {
       llvm::Error error = var.TakeLookupError();
       if (!error)
         continue;
+      auto get_name = [](SwiftASTManipulator::VariableInfo var) {
+        StringRef name = var.GetName().str();
+        if (name == "$__lldb_injected_self")
+          name = "self";
+        return name.str();
+      };
       diagnostic_manager.Printf(
-          eSeverityError,
-          "Missing type debug information for variable \"%s\": %s",
-          var.GetName().str().str().c_str(),
-          llvm::toString(std::move(error)).c_str());
-      return parse_result_failure;
+          eSeverityWarning, "Missing debug information for variable \"%s\": %s",
+          get_name(var).c_str(), llvm::toString(std::move(error)).c_str());
     }
     // Otherwise print the diagnostics from the Swift compiler.
     DiagnoseSwiftASTContextError();

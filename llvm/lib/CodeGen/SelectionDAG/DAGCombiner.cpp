@@ -17,6 +17,7 @@
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntervalMap.h"
@@ -6470,12 +6471,25 @@ static bool arebothOperandsNotNan(SDValue Operand1, SDValue Operand2,
   return DAG.isKnownNeverNaN(Operand2) && DAG.isKnownNeverNaN(Operand1);
 }
 
+/// Returns an appropriate FP min/max opcode for clamping operations.
+static unsigned getMinMaxOpcodeForClamp(bool IsMin, SDValue Operand1,
+                                        SDValue Operand2, SelectionDAG &DAG,
+                                        const TargetLowering &TLI) {
+  EVT VT = Operand1.getValueType();
+  unsigned IEEEOp = IsMin ? ISD::FMINNUM_IEEE : ISD::FMAXNUM_IEEE;
+  if (TLI.isOperationLegalOrCustom(IEEEOp, VT) &&
+      arebothOperandsNotNan(Operand1, Operand2, DAG))
+    return IEEEOp;
+  unsigned PreferredOp = IsMin ? ISD::FMINNUM : ISD::FMAXNUM;
+  if (TLI.isOperationLegalOrCustom(PreferredOp, VT))
+    return PreferredOp;
+  return ISD::DELETED_NODE;
+}
+
 // FIXME: use FMINIMUMNUM if possible, such as for RISC-V.
-static unsigned getMinMaxOpcodeForFP(SDValue Operand1, SDValue Operand2,
-                                     ISD::CondCode CC, unsigned OrAndOpcode,
-                                     SelectionDAG &DAG,
-                                     bool isFMAXNUMFMINNUM_IEEE,
-                                     bool isFMAXNUMFMINNUM) {
+static unsigned getMinMaxOpcodeForCompareFold(
+    SDValue Operand1, SDValue Operand2, ISD::CondCode CC, unsigned OrAndOpcode,
+    SelectionDAG &DAG, bool isFMAXNUMFMINNUM_IEEE, bool isFMAXNUMFMINNUM) {
   // The optimization cannot be applied for all the predicates because
   // of the way FMINNUM/FMAXNUM and FMINNUM_IEEE/FMAXNUM_IEEE handle
   // NaNs. For FMINNUM_IEEE/FMAXNUM_IEEE, the optimization cannot be
@@ -6631,9 +6645,9 @@ static SDValue foldAndOrOfSETCC(SDNode *LogicOp, SelectionDAG &DAG) {
         else
           NewOpcode = IsSigned ? ISD::SMAX : ISD::UMAX;
       } else if (OpVT.isFloatingPoint())
-        NewOpcode =
-            getMinMaxOpcodeForFP(Operand1, Operand2, CC, LogicOp->getOpcode(),
-                                 DAG, isFMAXNUMFMINNUM_IEEE, isFMAXNUMFMINNUM);
+        NewOpcode = getMinMaxOpcodeForCompareFold(
+            Operand1, Operand2, CC, LogicOp->getOpcode(), DAG,
+            isFMAXNUMFMINNUM_IEEE, isFMAXNUMFMINNUM);
 
       if (NewOpcode != ISD::DELETED_NODE) {
         SDValue MinMaxValue =
@@ -17571,7 +17585,8 @@ SDValue DAGCombiner::visitFADD(SDNode *N) {
   // N0 + -0.0 --> N0 (also allowed with +0.0 and fast-math)
   ConstantFPSDNode *N1C = isConstOrConstSplatFP(N1, true);
   if (N1C && N1C->isZero())
-    if (N1C->isNegative() || Options.NoSignedZerosFPMath || Flags.hasNoSignedZeros())
+    if (N1C->isNegative() || Flags.hasNoSignedZeros() ||
+        DAG.canIgnoreSignBitOfZero(SDValue(N, 0)))
       return N0;
 
   if (SDValue NewSel = foldBinOpIntoSelect(N))
@@ -17786,8 +17801,8 @@ SDValue DAGCombiner::visitFSUB(SDNode *N) {
 
   // (fsub A, 0) -> A
   if (N1CFP && N1CFP->isZero()) {
-    if (!N1CFP->isNegative() || Options.NoSignedZerosFPMath ||
-        Flags.hasNoSignedZeros()) {
+    if (!N1CFP->isNegative() || Flags.hasNoSignedZeros() ||
+        DAG.canIgnoreSignBitOfZero(SDValue(N, 0))) {
       return N0;
     }
   }
@@ -17800,8 +17815,8 @@ SDValue DAGCombiner::visitFSUB(SDNode *N) {
 
   // (fsub -0.0, N1) -> -N1
   if (N0CFP && N0CFP->isZero()) {
-    if (N0CFP->isNegative() ||
-        (Options.NoSignedZerosFPMath || Flags.hasNoSignedZeros())) {
+    if (N0CFP->isNegative() || Flags.hasNoSignedZeros() ||
+        DAG.canIgnoreSignBitOfZero(SDValue(N, 0))) {
       // We cannot replace an FSUB(+-0.0,X) with FNEG(X) when denormals are
       // flushed to zero, unless all users treat denorms as zero (DAZ).
       // FIXME: This transform will change the sign of a NaN and the behavior
@@ -18445,7 +18460,7 @@ SDValue DAGCombiner::visitFDIV(SDNode *N) {
   }
 
   // Fold X/Sqrt(X) -> Sqrt(X)
-  if ((Options.NoSignedZerosFPMath || Flags.hasNoSignedZeros()) &&
+  if ((Flags.hasNoSignedZeros() || DAG.canIgnoreSignBitOfZero(SDValue(N, 0))) &&
       Flags.hasAllowReassociation())
     if (N1.getOpcode() == ISD::FSQRT && N0 == N1.getOperand(0))
       return N1;
@@ -18497,8 +18512,9 @@ SDValue DAGCombiner::visitFREM(SDNode *N) {
       TLI.isOperationLegalOrCustom(ISD::FDIV, VT) &&
       TLI.isOperationLegalOrCustom(ISD::FTRUNC, VT) &&
       DAG.isKnownToBeAPowerOfTwoFP(N1)) {
-    bool NeedsCopySign =
-        !Flags.hasNoSignedZeros() && !DAG.cannotBeOrderedNegativeFP(N0);
+    bool NeedsCopySign = !Flags.hasNoSignedZeros() &&
+                         !DAG.canIgnoreSignBitOfZero(SDValue(N, 0)) &&
+                         !DAG.cannotBeOrderedNegativeFP(N0);
     SDValue Div = DAG.getNode(ISD::FDIV, DL, VT, N0, N1);
     SDValue Rnd = DAG.getNode(ISD::FTRUNC, DL, VT, Div);
     SDValue MLA;
@@ -18666,29 +18682,88 @@ SDValue DAGCombiner::visitFPOW(SDNode *N) {
 
 static SDValue foldFPToIntToFP(SDNode *N, const SDLoc &DL, SelectionDAG &DAG,
                                const TargetLowering &TLI) {
-  // We only do this if the target has legal ftrunc. Otherwise, we'd likely be
-  // replacing casts with a libcall. We also must be allowed to ignore -0.0
-  // because FTRUNC will return -0.0 for (-1.0, -0.0), but using integer
-  // conversions would return +0.0.
+  // We can fold the fpto[us]i -> [us]itofp pattern into a single ftrunc.
+  // Additionally, if there are clamps ([us]min or [us]max) around
+  // the fpto[us]i, we can fold those into fminnum/fmaxnum around the ftrunc.
+  // If NoSignedZerosFPMath is enabled, this is a direct replacement.
+  // Otherwise, for strict math, we must handle edge cases:
+  // 1. For unsigned conversions, use FABS to handle negative cases. Take -0.0
+  // as example, it first becomes integer 0, and is converted back to +0.0.
+  // FTRUNC on its own could produce -0.0.
+
   // FIXME: We should be able to use node-level FMF here.
   // TODO: If strict math, should we use FABS (+ range check for signed cast)?
   EVT VT = N->getValueType(0);
-  if (!TLI.isOperationLegal(ISD::FTRUNC, VT) ||
-      !DAG.getTarget().Options.NoSignedZerosFPMath)
+  if (!TLI.isOperationLegal(ISD::FTRUNC, VT))
     return SDValue();
 
-  // fptosi/fptoui round towards zero, so converting from FP to integer and
-  // back is the same as an 'ftrunc': [us]itofp (fpto[us]i X) --> ftrunc X
-  SDValue N0 = N->getOperand(0);
-  if (N->getOpcode() == ISD::SINT_TO_FP && N0.getOpcode() == ISD::FP_TO_SINT &&
-      N0.getOperand(0).getValueType() == VT)
-    return DAG.getNode(ISD::FTRUNC, DL, VT, N0.getOperand(0));
+  bool IsUnsigned = N->getOpcode() == ISD::UINT_TO_FP;
+  bool IsSigned = N->getOpcode() == ISD::SINT_TO_FP;
+  assert(IsSigned || IsUnsigned);
 
-  if (N->getOpcode() == ISD::UINT_TO_FP && N0.getOpcode() == ISD::FP_TO_UINT &&
-      N0.getOperand(0).getValueType() == VT)
-    return DAG.getNode(ISD::FTRUNC, DL, VT, N0.getOperand(0));
+  bool IsSignedZeroSafe = DAG.getTarget().Options.NoSignedZerosFPMath ||
+                          DAG.canIgnoreSignBitOfZero(SDValue(N, 0));
+  // For signed conversions: The optimization changes signed zero behavior.
+  if (IsSigned && !IsSignedZeroSafe)
+    return SDValue();
+  // For unsigned conversions, we need FABS to canonicalize -0.0 to +0.0
+  // (unless outputting a signed zero is OK).
+  if (IsUnsigned && !IsSignedZeroSafe && !TLI.isFAbsFree(VT))
+    return SDValue();
 
-  return SDValue();
+  // Collect potential clamp operations (outermost to innermost) and peel.
+  struct ClampInfo {
+    bool IsMin;
+    SDValue Constant;
+  };
+  constexpr unsigned MaxClamps = 2;
+  SmallVector<ClampInfo, MaxClamps> Clamps;
+  unsigned MinOp = IsUnsigned ? ISD::UMIN : ISD::SMIN;
+  unsigned MaxOp = IsUnsigned ? ISD::UMAX : ISD::SMAX;
+  SDValue IntVal = N->getOperand(0);
+  for (unsigned Level = 0; Level < MaxClamps; ++Level) {
+    if (!IntVal.hasOneUse() ||
+        (IntVal.getOpcode() != MinOp && IntVal.getOpcode() != MaxOp))
+      break;
+    SDValue RHS = IntVal.getOperand(1);
+    APInt IntConst;
+    if (auto *IntConstNode = dyn_cast<ConstantSDNode>(RHS))
+      IntConst = IntConstNode->getAPIntValue();
+    else if (!ISD::isConstantSplatVector(RHS.getNode(), IntConst))
+      return SDValue();
+    APFloat FPConst(VT.getFltSemantics());
+    FPConst.convertFromAPInt(IntConst, IsSigned, APFloat::rmNearestTiesToEven);
+    // Verify roundtrip exactness.
+    APSInt RoundTrip(IntConst.getBitWidth(), IsUnsigned);
+    bool IsExact;
+    if (FPConst.convertToInteger(RoundTrip, APFloat::rmTowardZero, &IsExact) !=
+            APFloat::opOK ||
+        !IsExact || static_cast<const APInt &>(RoundTrip) != IntConst)
+      return SDValue();
+    bool IsMin = IntVal.getOpcode() == MinOp;
+    Clamps.push_back({IsMin, DAG.getConstantFP(FPConst, DL, VT)});
+    IntVal = IntVal.getOperand(0);
+  }
+
+  // Check that the sequence ends with the correct kind of fpto[us]i.
+  unsigned FPToIntOp = IsUnsigned ? ISD::FP_TO_UINT : ISD::FP_TO_SINT;
+  if (IntVal.getOpcode() != FPToIntOp ||
+      IntVal.getOperand(0).getValueType() != VT)
+    return SDValue();
+
+  SDValue Result = IntVal.getOperand(0);
+  if (IsUnsigned && !IsSignedZeroSafe && TLI.isFAbsFree(VT))
+    Result = DAG.getNode(ISD::FABS, DL, VT, Result);
+  Result = DAG.getNode(ISD::FTRUNC, DL, VT, Result);
+  // Apply clamps, if any, in reverse order (innermost first).
+  for (const ClampInfo &Clamp : reverse(Clamps)) {
+    unsigned FPClampOp =
+        getMinMaxOpcodeForClamp(Clamp.IsMin, Result, Clamp.Constant, DAG, TLI);
+    if (FPClampOp == ISD::DELETED_NODE)
+      return SDValue();
+    Result = DAG.getNode(FPClampOp, DL, VT, Result, Clamp.Constant);
+  }
+  return Result;
 }
 
 SDValue DAGCombiner::visitSINT_TO_FP(SDNode *N) {

@@ -1,12 +1,26 @@
-// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage \
-// RUN:            -verify %s
-// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage \
-// RUN:            -verify %s -x objective-c++
-// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage-in-libc-call \
-// RUN:            -verify %s
-// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage-in-libc-call \
-// RUN:            -verify %s -DTEST_STD_NS
+// RUN: rm -rf %t
+// RUN: mkdir %t
+// RUN: split-file %s %t
 
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage -Wno-gcc-compat \
+// RUN:            -verify %t/test.cpp
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage -Wno-gcc-compat\
+// RUN:            -verify %t/test.cpp -x objective-c++
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage-in-libc-call -Wno-gcc-compat\
+// RUN:            -verify %t/test.cpp
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage-in-libc-call -Wno-gcc-compat\
+// RUN:            -verify -fexperimental-bounds-safety-attributes %t/test.cpp
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage -Wno-gcc-compat\
+// RUN:            -verify -fexperimental-bounds-safety-attributes %t/interop_test.cpp
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage-in-libc-call -Wno-gcc-compat\
+// RUN:            -verify -fexperimental-bounds-safety-attributes %t/test.cpp -DTEST_STD_NS
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage -Wunsafe-buffer-usage-in-format-attr-call -Wno-gcc-compat\
+// RUN:            -verify %t/format_attr_test.cpp
+// RUN: %clang_cc1 -std=c++20 -Wno-all -Wunsafe-buffer-usage -Wunsafe-buffer-usage-in-format-attr-call -Wno-gcc-compat\
+// RUN:            -verify -fexperimental-bounds-safety-attributes %t/format_attr_test.cpp
+
+
+//--- test.h
 typedef struct {} FILE;
 typedef unsigned int size_t;
 
@@ -79,6 +93,10 @@ namespace std {
   typedef basic_string_view<wchar_t> wstring_view;
 }
 
+//--- test.cpp
+
+#include "test.h"
+
 void f(char * p, char * q, std::span<char> s, std::span<char> s2) {
   typedef FILE * _Nullable aligned_file_ptr_t __attribute__((align_value(64)));
   typedef char * _Nullable aligned_char_ptr_t __attribute__((align_value(64)));
@@ -137,6 +155,10 @@ void f(char * p, char * q, std::span<char> s, std::span<char> s2) {
   snprintf(s.data(), s.size_bytes(), "%s%d", __PRETTY_FUNCTION__, *p); // no warn
   snwprintf(s.data(), s.size_bytes(), "%s%d", __PRETTY_FUNCTION__, *p); // no warn
   snwprintf_s(s.data(), s.size_bytes(), "%s%d", __PRETTY_FUNCTION__, *p); // no warn
+  snprintf(s.data(), s.size_bytes(), "%s%d"); // no warn
+  snprintf(s.data(), s.size_bytes(), "%s%d"); // no warn
+  snwprintf(s.data(), s.size_bytes(), "%s%d"); // no warn
+  snwprintf_s(s.data(), s.size_bytes(), "%s%d"); // no warn
   wprintf(L"hello %ls", L"world"); // no warn
   wprintf(L"hello %ls", WS.c_str()); // no warn
   strlen("hello");// no warn
@@ -210,8 +232,6 @@ void ff(char * p, char * q, std::span<char> s, std::span<char> s2) {
 #pragma clang diagnostic pop
 }
 
-
-
 // functions not in global scope or std:: namespace are not libc
 // functions regardless of their names:
 struct StrBuff
@@ -257,4 +277,160 @@ void test(StrBuff& str)
 void dontCrashForInvalidFormatString() {
   snprintf(nullptr, 0, "%");
   snprintf(nullptr, 0, "\0");
+}
+
+//--- format_attr_test.cpp
+
+#include "test.h"
+// Also warn about unsafe printf/scanf-like functions:
+void myprintf(const char *, ...) __attribute__((__format__ (__printf__, 1, 2)));
+void myprintf_2(const char *, int, const char *) __attribute__((__format__ (__printf__, 1, 3)));
+void myprintf_3(const char *, const char *, int, const char *) __attribute__((__format__ (__printf__, 2, 4)));
+void myscanf(const char *, ...) __attribute__((__format__ (__scanf__, 1, 2)));
+
+void myprintf_default(const char *, const char * Fmt = "hello %s",
+                      int X = 0, const char * Str = "world") __attribute__((__format__ (__printf__, 2, 4)));
+
+struct FormatAttrTestMember {
+  void myprintf(const char *, ...) __attribute__((__format__ (__printf__, 2, 3)));
+  void myprintf_2(const char *, int, const char *) __attribute__((__format__ (__printf__, 2, 4)));
+  void myprintf_3(const char *, const char *, int, const char *) __attribute__((__format__ (__printf__, 3, 5)));
+  void myscanf(const char *, ...) __attribute__((__format__ (__scanf__, 2, 3)));
+
+  void operator()(const char * Fmt, ...) __attribute__((__format__ (__printf__, 2, 3)));
+  void operator[](const char * Fmt) __attribute__((__format__ (__printf__, 2, 3)));
+
+
+  static const char * StrField;
+
+  void myprintf_default(const char *, const char * Fmt = "hello %s",
+			int X = 0, const char * Str = StrField) __attribute__((__format__ (__printf__, 3, 5)));
+};
+
+struct FormatAttrTestMember2 {
+  void operator()(const char * Fmt, char *) __attribute__((__format__ (__printf__, 2, 3)));
+};
+
+void test_format_attr(char * Str, std::string StdStr) {
+  myprintf("hello", Str);
+  myprintf("hello %s", StdStr.c_str());
+  myprintf("hello %s", Str);  // expected-warning{{formatting function 'myprintf' is unsafe}} \
+			         expected-note{{string argument is not guaranteed to be null-terminated}}
+
+  extern int errno;
+  extern char *strerror(int errnum);
+  myprintf("errno: %s", strerror(errno));
+
+  myprintf_2("hello", 0, Str);
+  myprintf_2("hello %s", 0, StdStr.c_str());
+  myprintf_2("hello %s", 0, Str);  // expected-warning{{formatting function 'myprintf_2' is unsafe}} \
+			              expected-note{{string argument is not guaranteed to be null-terminated}}
+
+  myprintf_3("irrelevant", "hello", 0, Str);
+  myprintf_3("irrelevant", "hello %s", 0, StdStr.c_str());
+  myprintf_3("irrelevant", "hello %s", 0, Str);  // expected-warning{{formatting function 'myprintf_3' is unsafe}} \
+			               expected-note{{string argument is not guaranteed to be null-terminated}}
+  myscanf("hello %s");
+  myscanf("hello %s", Str); // expected-warning{{function 'myscanf' is unsafe}}
+
+  myprintf_default("irrelevant");
+
+  int X;
+
+  myscanf("hello %d", &X); // expected-warning{{function 'myscanf' is unsafe}}
+
+  // Test member functions:
+  FormatAttrTestMember Obj;
+
+  Obj.myprintf("hello", Str);
+  Obj.myprintf("hello %s", StdStr.c_str());
+  Obj.myprintf("hello %s", Str);  // expected-warning{{formatting function 'myprintf' is unsafe}} \
+			         expected-note{{string argument is not guaranteed to be null-terminated}}
+
+  Obj.myprintf_2("hello", 0, Str);
+  Obj.myprintf_2("hello %s", 0, StdStr.c_str());
+  Obj.myprintf_2("hello %s", 0, Str);  // expected-warning{{formatting function 'myprintf_2' is unsafe}} \
+			              expected-note{{string argument is not guaranteed to be null-terminated}}
+
+  Obj.myprintf_3("irrelevant", "hello", 0, Str);
+  Obj.myprintf_3("irrelevant", "hello %s", 0, StdStr.c_str());
+  Obj.myprintf_3("irrelevant", "hello %s", 0, Str);  // expected-warning{{formatting function 'myprintf_3' is unsafe}} \
+			               expected-note{{string argument is not guaranteed to be null-terminated}}
+
+  Obj.myscanf("hello %s");
+  Obj.myscanf("hello %s", Str); // expected-warning{{formatting function 'myscanf' is unsafe}}
+
+  Obj.myscanf("hello %d", &X); // expected-warning{{formatting function 'myscanf' is unsafe}}
+
+  Obj.myprintf_default("irrelevant"); // expected-warning{{formatting function 'myprintf_default' is unsafe}}
+  // expected-note@*{{string argument is not guaranteed to be null-terminated}}
+
+  Obj("hello", Str);
+  Obj("hello %s", StdStr.c_str());
+  Obj("hello %s", Str);  // expected-warning{{formatting function 'operator()' is unsafe}} \
+    		            expected-note{{string argument is not guaranteed to be null-terminated}}
+  Obj["hello"];
+  Obj["hello %s"];
+
+  FormatAttrTestMember2 Obj2;
+
+  Obj2("hello", Str);
+  Obj2("hello %s", StdStr.c_str());
+  Obj2("hello %s", Str);  // expected-warning{{formatting function 'operator()' is unsafe}} \
+			 expected-note{{string argument is not guaranteed to be null-terminated}}
+}
+
+// The second attribute argument, which points the starting index of
+// format string arguments, may not be a valid argument index:
+void myprintf_arg_idx_oob(const char *) __attribute__((__format__ (__printf__, 1, 2)));
+
+void test_format_attr_invalid_arg_idx(char * Str, std::string StdStr) {
+  myprintf_arg_idx_oob("hello");
+  myprintf_arg_idx_oob(Str); // expected-warning{{formatting function 'myprintf_arg_idx_oob' is unsafe}} expected-note{{string argument is not guaranteed to be null-terminated}}
+  myprintf_arg_idx_oob(StdStr.c_str());
+  myprintf("hello");
+  myprintf(Str); // expected-warning{{formatting function 'myprintf' is unsafe}} expected-note{{string argument is not guaranteed to be null-terminated}}
+  myprintf(StdStr.c_str());
+}
+
+//--- interop_test.cpp
+
+#include <ptrcheck.h>
+typedef unsigned size_t;
+
+// expected-note@+2{{consider using a safe container and passing '.data()' to the parameter 'dst' and '.size()' to its dependent parameter 'size' or 'std::span' and passing '.first(...).data()' to the parameter 'dst'}}
+// expected-note@+1{{consider using a safe container and passing '.data()' to the parameter 'src' and '.size()' to its dependent parameter 'size' or 'std::span' and passing '.first(...).data()' to the parameter 'src'}}
+void memcpy(void * __sized_by(size) dst, const void * __sized_by(size) src, unsigned size);
+unsigned strlen( const char* __null_terminated str );
+// expected-note@+1{{consider using a safe container and passing '.data()' to the parameter 'buffer' and '.size()' to its dependent parameter 'buf_size' or 'std::span' and passing '.first(...).data()' to the parameter 'buffer'}}
+int snprintf( char* __counted_by(buf_size) buffer, unsigned buf_size, const char* format, ... );
+int snwprintf( char* __counted_by(buf_size) buffer, unsigned buf_size, const char* format, ... );
+int vsnprintf( char* __counted_by(buf_size) buffer, unsigned buf_size, const char* format, ... );
+int sprintf( char* __counted_by(10) buffer, const char* format, ... );
+
+void test(char * p, char * q, const char * str,
+	  const char * __null_terminated safe_str,
+	  char * __counted_by(n) safe_p,
+	  size_t n,
+	  char * __counted_by(10) safe_ten) {
+  memcpy(p, q, 10);                  // expected-warning2{{unsafe assignment to function parameter of count-attributed type}}
+  snprintf(p, 10, "%s", "hlo");      // expected-warning{{unsafe assignment to function parameter of count-attributed type}}
+
+  // We still warn about unsafe string pointer arguments to printfs:
+
+  snprintf(safe_p, n, "%s", str);  // expected-warning{{function 'snprintf' is unsafe}} expected-note{{string argument is not guaranteed to be null-terminated}}
+  snwprintf(safe_p, n, "%s", str); // expected-warning{{function 'snwprintf' is unsafe}} expected-note{{string argument is not guaranteed to be null-terminated}}
+
+  memcpy(safe_p, safe_p, n);               // no warn
+  strlen(safe_str);                        // no warn
+  snprintf(safe_p, n, "%s", "hlo");        // no warn
+  snprintf(safe_p, n, "%s", safe_str);     // no warn
+  snwprintf(safe_p, n, "%s", safe_str);    // no warn
+
+  // v-printf functions and sprintf are still warned about because
+  // they cannot be fully safe:
+
+  vsnprintf(safe_p, n, "%s", safe_str); // expected-warning{{function 'vsnprintf' is unsafe}} expected-note{{'va_list' is unsafe}}
+  sprintf(safe_ten, "%s", safe_str);    // expected-warning{{function 'sprintf' is unsafe}} expected-note{{change to 'snprintf' for explicit bounds checking}}
+
 }

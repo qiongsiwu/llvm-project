@@ -14107,6 +14107,10 @@ def warn_unsafe_buffer_operation : Warning<
 def warn_unsafe_buffer_libc_call : Warning<
   "function %0 is unsafe">,
   InGroup<UnsafeBufferUsageInLibcCall>, DefaultIgnore;
+def warn_unsafe_buffer_format_attr_call : Warning<
+  "formatting function %0 is unsafe">,
+  InGroup<UnsafeBufferUsageInFormatAttrCall>, DefaultIgnore;
+
 def note_unsafe_buffer_printf_call : Note<
   "%select{|change to 'snprintf' for explicit bounds checking | buffer pointer and size may not match"
           "|string argument is not guaranteed to be null-terminated"
@@ -14138,6 +14142,10 @@ def note_unsafe_count_attributed_pointer_argument_null_to_nonnull : Note<
 def warn_unsafe_single_pointer_argument : Warning<
   "unsafe assignment to function parameter of __single pointer type">,
   InGroup<UnsafeBufferUsage>, DefaultIgnore;
+def warn_unsafe_buffer_usage_unique_ptr_array_access : Warning<"direct access using operator[] on std::unique_ptr<T[]> is unsafe due to lack of bounds checking">,
+  InGroup<UnsafeBufferUsageInUniquePtrArrayAccess>, DefaultIgnore;
+def warn_unsafe_buffer_usage_in_static_sized_array : Warning<"direct access on T[N] is unsafe due to the lack of bounds checking">,
+  InGroup<UnsafeBufferUsageInStaticSizedArray>, DefaultIgnore;  
 def warn_unsafe_single_pointer_assignment : Warning<
   "unsafe assignment to __single pointer type">,
   InGroup<UnsafeBufferUsage>, DefaultIgnore;
@@ -14164,6 +14172,7 @@ def warn_assigned_and_used_in_bounds_attributed_group : Warning<
 def warn_unsafe_count_attributed_pointer_assignment : Warning<
   "unsafe assignment to count-attributed pointer">,
   InGroup<UnsafeBufferUsage>, DefaultIgnore;
+
 #ifndef NDEBUG
 // Not a user-facing diagnostic. Useful for debugging false negatives in
 // -fsafe-buffer-usage-suggestions (i.e. lack of -Wunsafe-buffer-usage fixits).
