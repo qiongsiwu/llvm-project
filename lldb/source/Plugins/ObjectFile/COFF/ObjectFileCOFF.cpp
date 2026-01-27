@@ -11,7 +11,6 @@
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ModuleSpec.h"
 #include "lldb/Core/PluginManager.h"
-#include "lldb/Utility/DataExtractor.h"
 #include "lldb/Utility/LLDBLog.h"
 
 #include "llvm/Support/Error.h"
@@ -45,45 +44,41 @@ void ObjectFileCOFF::Terminate() {
 }
 
 lldb_private::ObjectFile *
-ObjectFileCOFF::CreateInstance(const ModuleSP &module_sp,
-                               DataExtractorSP extractor_sp,
+ObjectFileCOFF::CreateInstance(const ModuleSP &module_sp, DataBufferSP data_sp,
                                offset_t data_offset, const FileSpec *file,
                                offset_t file_offset, offset_t length) {
   Log *log = GetLog(LLDBLog::Object);
 
-  if (!extractor_sp || !extractor_sp->HasData()) {
-    DataBufferSP data_sp = MapFileData(*file, length, file_offset);
+  if (!data_sp) {
+    data_sp = MapFileData(*file, length, file_offset);
     if (!data_sp) {
       LLDB_LOG(log,
                "Failed to create ObjectFileCOFF instance: cannot read file {0}",
                file->GetPath());
       return nullptr;
     }
-    extractor_sp = std::make_shared<lldb_private::DataExtractor>(data_sp);
     data_offset = 0;
   }
 
-  assert(extractor_sp && extractor_sp->HasData() &&
-         "must have mapped file at this point");
+  assert(data_sp && "must have mapped file at this point");
 
-  if (!IsCOFFObjectFile(extractor_sp->GetSharedDataBuffer()))
+  if (!IsCOFFObjectFile(data_sp))
     return nullptr;
 
-  if (extractor_sp->GetByteSize() < length) {
-    DataBufferSP data_sp = MapFileData(*file, length, file_offset);
+  if (data_sp->GetByteSize() < length) {
+    data_sp = MapFileData(*file, length, file_offset);
     if (!data_sp) {
       LLDB_LOG(log,
                "Failed to create ObjectFileCOFF instance: cannot read file {0}",
                file->GetPath());
       return nullptr;
     }
-    extractor_sp = std::make_shared<lldb_private::DataExtractor>(data_sp);
     data_offset = 0;
   }
 
-  MemoryBufferRef buffer{
-      toStringRef(extractor_sp->GetSharedDataBuffer()->GetData()),
-      file->GetFilename().GetStringRef()};
+
+  MemoryBufferRef buffer{toStringRef(data_sp->GetData()),
+                         file->GetFilename().GetStringRef()};
 
   Expected<std::unique_ptr<Binary>> binary = createBinary(buffer);
   if (!binary) {
@@ -98,8 +93,8 @@ ObjectFileCOFF::CreateInstance(const ModuleSP &module_sp,
            file->GetPath());
 
   return new ObjectFileCOFF(unique_dyn_cast<COFFObjectFile>(std::move(*binary)),
-                            module_sp, extractor_sp, data_offset, file,
-                            file_offset, length);
+                            module_sp, data_sp, data_offset, file, file_offset,
+                            length);
 }
 
 lldb_private::ObjectFile *ObjectFileCOFF::CreateMemoryInstance(
