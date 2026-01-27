@@ -9,6 +9,7 @@
 #ifndef LLDB_UTILITY_DATAEXTRACTOR_H
 #define LLDB_UTILITY_DATAEXTRACTOR_H
 
+#include "lldb/Utility/DataBuffer.h"
 #include "lldb/Utility/Endian.h"
 #include "lldb/lldb-defines.h"
 #include "lldb/lldb-enumerations.h"
@@ -91,10 +92,10 @@ public:
 
   /// Construct with shared data.
   ///
-  /// Copies the data shared pointer which adds a reference to the contained
-  /// in \a data_sp. The shared data reference is reference counted to ensure
-  /// the data lives as long as anyone still has a valid shared pointer to the
-  /// data in \a data_sp.
+  /// Copies the data shared pointer which adds a reference to the data
+  /// contained in \a data_sp. The shared data reference is reference counted to
+  /// ensure the data lives as long as anyone still has a valid shared pointer
+  /// to the data in \a data_sp.
   ///
   /// \param[in] data_sp
   ///     A shared pointer to data.
@@ -109,6 +110,18 @@ public:
   ///     A size of a target byte in 8-bit host bytes
   DataExtractor(const lldb::DataBufferSP &data_sp, lldb::ByteOrder byte_order,
                 uint32_t addr_size, uint32_t target_byte_size = 1);
+
+  /// Construct with shared data, but byte-order & addr-size are unspecified.
+  ///
+  /// Copies the data shared pointer which adds a reference to the data
+  /// contained in \a data_sp. The shared data reference is reference counted to
+  /// ensure the data lives as long as anyone still has a valid shared pointer
+  /// to the data in \a data_sp.
+  ///
+  /// \param[in] data_sp
+  ///     A shared pointer to data.
+  DataExtractor(const lldb::DataBufferSP &data_sp,
+                uint32_t target_byte_size = 1);
 
   /// Construct with a subset of \a data.
   ///
@@ -834,6 +847,8 @@ public:
   virtual lldb::DataExtractorSP GetSubsetExtractorSP(lldb::offset_t offset);
 
   lldb::DataBufferSP &GetSharedDataBuffer() { return m_data_sp; }
+
+  bool HasData() { return m_start && m_end && m_end - m_start > 0; }
 
   /// Peek at a C string at \a offset.
   ///
