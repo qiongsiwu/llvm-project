@@ -417,14 +417,14 @@ ObjectFileSP ObjectContainerBSDArchive::GetObjectFile(const FileSpec *file) {
           lldb::offset_t data_offset = 0;
           DataExtractorSP extractor_sp =
               std::make_shared<DataExtractor>(child_data_sp);
-          return ObjectFile::FindPlugin(
+          return lldb_private::ObjectFile::FindPlugin(
               module_sp, &child, m_offset + object->file_offset,
               object->file_size, extractor_sp, data_offset);
         }
         lldb::offset_t data_offset = object->file_offset;
         DataExtractorSP extractor_sp =
             std::make_shared<DataExtractor>(m_archive_sp->GetData());
-        return ObjectFile::FindPlugin(
+        return lldb_private::ObjectFile::FindPlugin(
             module_sp, file, m_offset + object->file_offset, object->file_size,
             extractor_sp, data_offset);
       }
