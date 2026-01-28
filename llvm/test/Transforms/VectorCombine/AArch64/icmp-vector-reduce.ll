@@ -4,9 +4,8 @@
 define i1 @or_zext(<4 x i16> %x) {
 ; CHECK-LABEL: define i1 @or_zext(
 ; CHECK-SAME: <4 x i16> [[X:%.*]]) {
-; CHECK-NEXT:    [[ZEXT:%.*]] = zext <4 x i16> [[X]] to <4 x i32>
-; CHECK-NEXT:    [[RED:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[ZEXT]])
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[RED]], 0
+; CHECK-NEXT:    [[TMP1:%.*]] = call i16 @llvm.vector.reduce.umax.v4i16(<4 x i16> [[X]])
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i16 [[TMP1]], 0
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %zext = zext <4 x i16> %x to <4 x i32>
@@ -18,9 +17,8 @@ define i1 @or_zext(<4 x i16> %x) {
 define i1 @or_zext_i3(<4 x i3> %x) {
 ; CHECK-LABEL: define i1 @or_zext_i3(
 ; CHECK-SAME: <4 x i3> [[X:%.*]]) {
-; CHECK-NEXT:    [[ZEXT:%.*]] = zext <4 x i3> [[X]] to <4 x i32>
-; CHECK-NEXT:    [[RED:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[ZEXT]])
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[RED]], 0
+; CHECK-NEXT:    [[TMP1:%.*]] = call i3 @llvm.vector.reduce.umax.v4i3(<4 x i3> [[X]])
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i3 [[TMP1]], 0
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %zext = zext <4 x i3> %x to <4 x i32>
@@ -45,9 +43,8 @@ define i1 @or_zext_v3_costly(<3 x i8> %x) {
 define i1 @or_sext(<4 x i16> %x) {
 ; CHECK-LABEL: define i1 @or_sext(
 ; CHECK-SAME: <4 x i16> [[X:%.*]]) {
-; CHECK-NEXT:    [[SEXT:%.*]] = sext <4 x i16> [[X]] to <4 x i32>
-; CHECK-NEXT:    [[RED:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[SEXT]])
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[RED]], 0
+; CHECK-NEXT:    [[TMP1:%.*]] = call i16 @llvm.vector.reduce.umax.v4i16(<4 x i16> [[X]])
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i16 [[TMP1]], 0
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %sext = sext <4 x i16> %x to <4 x i32>
