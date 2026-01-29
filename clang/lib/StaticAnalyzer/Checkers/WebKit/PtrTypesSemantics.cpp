@@ -419,6 +419,28 @@ bool isSmartPtr(const CXXRecordDecl *R) {
   return false;
 }
 
+enum class WebKitAnnotation : uint8_t {
+  None,
+  PointerConversion,
+  NoDelete,
+};
+
+static WebKitAnnotation typeAnnotationForReturnType(const FunctionDecl *FD) {
+  auto RetType = FD->getReturnType();
+  auto *Attr = dyn_cast_or_null<AttributedType>(RetType.getTypePtrOrNull());
+  if (!Attr)
+    return WebKitAnnotation::None;
+  auto *AnnotateType = dyn_cast_or_null<AnnotateTypeAttr>(Attr->getAttr());
+  if (!AnnotateType)
+    return WebKitAnnotation::None;
+  auto Annotation = AnnotateType->getAnnotation();
+  if (Annotation == "webkit.pointerconversion")
+    return WebKitAnnotation::PointerConversion;
+  if (Annotation == "webkit.nodelete")
+    return WebKitAnnotation::NoDelete;
+  return WebKitAnnotation::None;
+}
+
 bool isPtrConversion(const FunctionDecl *F) {
   assert(F);
   if (isCtorOfRefCounted(F))
@@ -436,19 +458,14 @@ bool isPtrConversion(const FunctionDecl *F) {
       FunctionName == "checked_objc_cast")
     return true;
 
-  auto ReturnType = F->getReturnType();
-  if (auto *Type = ReturnType.getTypePtrOrNull()) {
-    if (auto *AttrType = dyn_cast<AttributedType>(Type)) {
-      if (auto *Attr = AttrType->getAttr()) {
-        if (auto *AnnotateType = dyn_cast<AnnotateTypeAttr>(Attr)) {
-          if (AnnotateType->getAnnotation() == "webkit.pointerconversion")
-            return true;
-        }
-      }
-    }
-  }
+  if (typeAnnotationForReturnType(F) == WebKitAnnotation::PointerConversion)
+    return true;
 
   return false;
+}
+
+bool isNoDeleteFunction(const FunctionDecl *F) {
+  return typeAnnotationForReturnType(F) == WebKitAnnotation::NoDelete;
 }
 
 bool isTrivialBuiltinFunction(const FunctionDecl *F) {
@@ -519,6 +536,8 @@ public:
 
   bool IsFunctionTrivial(const Decl *D) {
     if (auto *FnDecl = dyn_cast<FunctionDecl>(D)) {
+      if (isNoDeleteFunction(FnDecl))
+        return true;
       if (FnDecl->isVirtualAsWritten())
         return false;
     }
