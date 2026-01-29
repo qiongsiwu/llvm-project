@@ -2090,7 +2090,7 @@ def fbounds_safety_soft_trap_function_EQ : Joined<["-"],
 
 defm lifetime_safety : BoolFOption<
   "lifetime-safety",
-  LangOpts<"EnableLifetimeSafety">, DefaultTrue,
+  LangOpts<"EnableLifetimeSafety">, DefaultFalse,
   PosFlag<SetTrue, [], [CC1Option], "Enable">,
   NegFlag<SetFalse, [], [CC1Option], "Disable">,
   BothFlags<[], [CC1Option],

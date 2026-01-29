@@ -1,8 +1,8 @@
 // RUN: %clang_cc1 -fsyntax-only -Wdangling -Wdangling-field -Wreturn-stack-address -verify %s
-// RUN: %clang_cc1 -fsyntax-only -Wlifetime-safety -Wno-dangling -verify=cfg,cfg-field %s
+// RUN: %clang_cc1 -fsyntax-only -flifetime-safety -Wlifetime-safety -Wno-dangling -verify=cfg,cfg-field %s
 
 // FIXME: cfg-field should be detected in end-of-TU analysis but it doesn't work for constructors!
-// RUN: %clang_cc1 -fsyntax-only -flifetime-safety-inference -fexperimental-lifetime-safety-tu-analysis -Wlifetime-safety -Wno-dangling -verify=cfg %s
+// RUN: %clang_cc1 -fsyntax-only -flifetime-safety -flifetime-safety-inference -fexperimental-lifetime-safety-tu-analysis -Wlifetime-safety -Wno-dangling -verify=cfg %s
 
 #include "Inputs/lifetime-analysis.h"
 

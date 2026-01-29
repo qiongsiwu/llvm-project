@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -fsyntax-only -Wlifetime-safety -Wno-dangling -verify=expected,function %s
-// RUN: %clang_cc1 -fsyntax-only -flifetime-safety-inference -fexperimental-lifetime-safety-tu-analysis -Wlifetime-safety -Wno-dangling -verify=expected,tu %s
+// RUN: %clang_cc1 -fsyntax-only -flifetime-safety -Wlifetime-safety -Wno-dangling -verify=expected,function %s
+// RUN: %clang_cc1 -fsyntax-only -flifetime-safety -flifetime-safety-inference -fexperimental-lifetime-safety-tu-analysis -Wlifetime-safety -Wno-dangling -verify=expected,tu %s
 
 #include "Inputs/lifetime-analysis.h"
 
