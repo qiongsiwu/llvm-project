@@ -2089,7 +2089,7 @@ def fbounds_safety_soft_trap_function_EQ : Joined<["-"],
 // TO_UPSTREAM(BoundsSafety) OFF
 
 defm lifetime_safety : BoolFOption<
-  "experimental-lifetime-safety",
+  "lifetime-safety",
   LangOpts<"EnableLifetimeSafety">, DefaultFalse,
   PosFlag<SetTrue, [], [CC1Option], "Enable">,
   NegFlag<SetFalse, [], [CC1Option], "Disable">,
@@ -2097,12 +2097,22 @@ defm lifetime_safety : BoolFOption<
           " experimental lifetime safety for C++">>;
 
 defm lifetime_safety_inference
-    : BoolFOption<"experimental-lifetime-safety-inference",
+    : BoolFOption<"lifetime-safety-inference",
                   LangOpts<"EnableLifetimeSafetyInference">, DefaultFalse,
                   PosFlag<SetTrue, [], [CC1Option], "Enable">,
                   NegFlag<SetFalse, [], [CC1Option], "Disable">,
                   BothFlags<[], [CC1Option],
                             " experimental lifetime safety inference for C++">>;
+
+defm lifetime_safety_tu_analysis
+    : BoolFOption<"experimental-lifetime-safety-tu-analysis",
+                  LangOpts<"EnableLifetimeSafetyTUAnalysis">, DefaultFalse,
+                  PosFlag<SetTrue, [], [CC1Option], "Enable">,
+                  NegFlag<SetFalse, [], [CC1Option], "Disable">,
+                  BothFlags<[], [CC1Option],
+                            " run lifetime safety analysis at translation-unit "
+                            "end, analyzing functions in call graph post-order "
+                            "to best propagate inferred annotations">>;
 
 defm addrsig : BoolFOption<"addrsig",
   CodeGenOpts<"Addrsig">, DefaultFalse,

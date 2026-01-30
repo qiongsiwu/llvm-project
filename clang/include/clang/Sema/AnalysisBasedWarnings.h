@@ -15,6 +15,8 @@
 
 #include "clang/AST/Decl.h"
 #include "llvm/ADT/DenseMap.h"
+#include "clang/Analysis/Analyses/LifetimeSafety/LifetimeStats.h"
+#include "clang/Sema/ScopeInfo.h"
 #include <memory>
 
 namespace clang {
@@ -94,6 +96,11 @@ private:
   /// Max number of block visits during uninitialized use analysis of
   /// a single function.
   unsigned MaxUninitAnalysisBlockVisitsPerFunction;
+
+  /// Statistics collected during lifetime safety analysis.
+  /// These are accumulated across all analyzed functions and printed
+  /// when -print-stats is enabled.
+  clang::lifetimes::LifetimeSafetyStats LSStats;
 
   /// @}
 
