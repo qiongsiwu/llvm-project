@@ -846,8 +846,41 @@ const VPBasicBlock *VPBasicBlock::getCFGPredecessor(unsigned Idx) const {
 InstructionCost VPRegionBlock::cost(ElementCount VF, VPCostContext &Ctx) {
   if (!isReplicator()) {
     InstructionCost Cost = 0;
-    for (VPBlockBase *Block : vp_depth_first_shallow(getEntry()))
+    SmallPtrSet<VPValue *, 4> Masks;
+    for (VPBlockBase *Block : vp_depth_first_shallow(getEntry())) {
+      if (auto *VPR = dyn_cast<VPRegionBlock>(Block)) {
+        if (VPR->isReplicator()) {
+          // Only add mask cost if the replicator's recipes are costed through
+          // VPlan (not skipped for legacy costing which already includes mask
+          // extraction).
+          VPBasicBlock *Then =
+              cast<VPBasicBlock>(VPR->getEntry()->getSuccessors()[0]);
+          for (VPRecipeBase &R : *Then) {
+            auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+            if (!RepR)
+              continue;
+            auto *UI =
+                dyn_cast_or_null<Instruction>(RepR->getUnderlyingValue());
+            if (!UI || Ctx.skipCostComputation(UI, VF.isVector()))
+              continue;
+            if (!useVPlanCostModelForReplicatingStore(VF, UI))
+              continue;
+            Masks.insert(VPR->getEntryBasicBlock()->front().getOperand(0));
+            break;
+          }
+        }
+      }
       Cost += Block->cost(VF, Ctx);
+    }
+    if (VF.isFixed() && Masks.size() > 0) {
+      auto *VecI1Ty = VectorType::get(
+          IntegerType::getInt1Ty(Ctx.L->getHeader()->getContext()), VF);
+      Cost +=
+          Masks.size() * Ctx.TTI.getScalarizationOverhead(
+                             VecI1Ty, APInt::getAllOnes(VF.getFixedValue()),
+                             /*Insert=*/false, /*Extract=*/true, Ctx.CostKind);
+    }
+
     InstructionCost BackedgeCost =
         ForceTargetInstructionCost.getNumOccurrences()
             ? InstructionCost(ForceTargetInstructionCost.getNumOccurrences())
@@ -1695,7 +1728,7 @@ VPCostContext::getOperandInfo(VPValue *V) const {
 
 InstructionCost VPCostContext::getScalarizationOverhead(
     Type *ResultTy, ArrayRef<const VPValue *> Operands, ElementCount VF,
-    bool AlwaysIncludeReplicatingR) {
+    TTI::VectorInstrContext VIC, bool AlwaysIncludeReplicatingR) {
   if (VF.isScalar())
     return 0;
 
@@ -1706,8 +1739,8 @@ InstructionCost VPCostContext::getScalarizationOverhead(
          to_vector(getContainedTypes(toVectorizedTy(ResultTy, VF)))) {
       ScalarizationCost += TTI.getScalarizationOverhead(
           cast<VectorType>(VectorTy), APInt::getAllOnes(VF.getFixedValue()),
-          /*Insert=*/true,
-          /*Extract=*/false, CostKind);
+          /*Insert=*/true, /*Extract=*/false, CostKind,
+          /*ForPoisonSrc=*/true, {}, VIC);
     }
   }
   // Compute the cost of scalarizing the operands, skipping ones that do not
@@ -1725,5 +1758,5 @@ InstructionCost VPCostContext::getScalarizationOverhead(
     Tys.push_back(toVectorizedTy(Types.inferScalarType(Op), VF));
   }
   return ScalarizationCost +
-         TTI.getOperandsScalarizationOverhead(Tys, CostKind);
+         TTI.getOperandsScalarizationOverhead(Tys, CostKind, VIC);
 }

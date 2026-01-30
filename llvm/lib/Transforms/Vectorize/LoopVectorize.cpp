@@ -947,9 +947,8 @@ public:
   /// user options, for the given register kind.
   bool useMaxBandwidth(TargetTransformInfo::RegisterKind RegKind);
 
-  /// \return True if maximizing vector bandwidth is enabled by the target or
-  /// user options, for the given vector factor.
-  bool useMaxBandwidth(ElementCount VF);
+  /// \return True if register pressure should be considered for the given VF.
+  bool shouldConsiderRegPressureForVF(ElementCount VF);
 
   /// \return The size (in bits) of the smallest and widest types in the code
   /// that needs to be vectorized. We ignore values that remain scalar such as
@@ -1749,6 +1748,9 @@ public:
   /// Whether this loop should be optimized for size based on function attribute
   /// or profile information.
   bool OptForSize;
+
+  /// The highest VF possible for this loop, without using MaxBandwidth.
+  FixedScalableVFPair MaxPermissibleVFWithoutMaxBW;
 };
 } // end namespace llvm
 
@@ -3842,10 +3844,16 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   return FixedScalableVFPair::getNone();
 }
 
-bool LoopVectorizationCostModel::useMaxBandwidth(ElementCount VF) {
-  return useMaxBandwidth(VF.isScalable()
-                             ? TargetTransformInfo::RGK_ScalableVector
-                             : TargetTransformInfo::RGK_FixedWidthVector);
+bool LoopVectorizationCostModel::shouldConsiderRegPressureForVF(
+    ElementCount VF) {
+  if (!useMaxBandwidth(VF.isScalable()
+                           ? TargetTransformInfo::RGK_ScalableVector
+                           : TargetTransformInfo::RGK_FixedWidthVector))
+    return false;
+  // Only calculate register pressure for VFs enabled by MaxBandwidth.
+  return ElementCount::isKnownGT(
+      VF, VF.isScalable() ? MaxPermissibleVFWithoutMaxBW.ScalableVF
+                          : MaxPermissibleVFWithoutMaxBW.FixedVF);
 }
 
 bool LoopVectorizationCostModel::useMaxBandwidth(
@@ -3921,6 +3929,12 @@ ElementCount LoopVectorizationCostModel::getMaximizedVFForTarget(
       ComputeScalableMaxVF ? TargetTransformInfo::RGK_ScalableVector
                            : TargetTransformInfo::RGK_FixedWidthVector;
   ElementCount MaxVF = MaxVectorElementCount;
+
+  if (MaxVF.isScalable())
+    MaxPermissibleVFWithoutMaxBW.ScalableVF = MaxVF;
+  else
+    MaxPermissibleVFWithoutMaxBW.FixedVF = MaxVF;
+
   if (useMaxBandwidth(RegKind)) {
     auto MaxVectorElementCountMaxBW = ElementCount::get(
         llvm::bit_floor(WidestRegister.getKnownMinValue() / SmallestType),
@@ -4264,8 +4278,9 @@ VectorizationFactor LoopVectorizationPlanner::selectVectorizationFactor() {
                                P->vectorFactors().end());
 
     SmallVector<VPRegisterUsage, 8> RUs;
-    if (CM.useMaxBandwidth(TargetTransformInfo::RGK_ScalableVector) ||
-        CM.useMaxBandwidth(TargetTransformInfo::RGK_FixedWidthVector))
+    if (any_of(VFs, [this](ElementCount VF) {
+          return CM.shouldConsiderRegPressureForVF(VF);
+        }))
       RUs = calculateRegisterUsageForPlan(*P, VFs, TTI, CM.ValuesToIgnore);
 
     for (unsigned I = 0; I < VFs.size(); I++) {
@@ -4274,9 +4289,11 @@ VectorizationFactor LoopVectorizationPlanner::selectVectorizationFactor() {
       if (VF.isScalar())
         continue;
 
-      /// Don't consider the VF if it exceeds the number of registers for the
-      /// target.
-      if (CM.useMaxBandwidth(VF) && RUs[I].exceedsMaxNumRegs(TTI))
+      /// If the register pressure needs to be considered for VF,
+      /// don't consider the VF as valid if it exceeds the number
+      /// of registers for the target.
+      if (CM.shouldConsiderRegPressureForVF(VF) &&
+          RUs[I].exceedsMaxNumRegs(TTI, ForceTargetNumVectorRegs))
         continue;
 
       InstructionCost C = CM.expectedCost(VF);
@@ -5553,11 +5570,17 @@ LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
   if (!RetTy->isVoidTy() &&
       (!isa<LoadInst>(I) || !TTI.supportsEfficientVectorElementLoadStore())) {
 
+    TTI::VectorInstrContext VIC = TTI::VectorInstrContext::None;
+    if (isa<LoadInst>(I))
+      VIC = TTI::VectorInstrContext::Load;
+    else if (isa<StoreInst>(I))
+      VIC = TTI::VectorInstrContext::Store;
+
     for (Type *VectorTy : getContainedTypes(RetTy)) {
       Cost += TTI.getScalarizationOverhead(
           cast<VectorType>(VectorTy), APInt::getAllOnes(VF.getFixedValue()),
-          /*Insert=*/true,
-          /*Extract=*/false, CostKind);
+          /*Insert=*/true, /*Extract=*/false, CostKind,
+          /*ForPoisonSrc=*/true, {}, VIC);
     }
   }
 
@@ -5578,7 +5601,11 @@ LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
   SmallVector<Type *> Tys;
   for (auto *V : filterExtractingOperands(Ops, VF))
     Tys.push_back(maybeVectorizeType(V->getType(), VF));
-  return Cost + TTI.getOperandsScalarizationOverhead(Tys, CostKind);
+
+  TTI::VectorInstrContext OperandVIC = isa<StoreInst>(I)
+                                           ? TTI::VectorInstrContext::Store
+                                           : TTI::VectorInstrContext::None;
+  return Cost + TTI.getOperandsScalarizationOverhead(Tys, CostKind, OperandVIC);
 }
 
 void LoopVectorizationCostModel::setCostBasedWideningDecision(ElementCount VF) {
@@ -7026,20 +7053,7 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
     }
   }
 
-  // Return true if the loop contains any instructions that are not also part of
-  // the VPlan or are skipped for VPlan-based cost computations. This indicates
-  // that the VPlan contains extra simplifications.
-  return any_of(TheLoop->blocks(), [&SeenInstrs, &CostCtx,
-                                    TheLoop](BasicBlock *BB) {
-    return any_of(*BB, [&SeenInstrs, &CostCtx, TheLoop, BB](Instruction &I) {
-      // Skip induction phis when checking for simplifications, as they may not
-      // be lowered directly be lowered to a corresponding PHI recipe.
-      if (isa<PHINode>(&I) && BB == TheLoop->getHeader() &&
-          CostCtx.CM.Legal->isInductionPhi(cast<PHINode>(&I)))
-        return false;
-      return !SeenInstrs.contains(&I) && !CostCtx.skipCostComputation(&I, true);
-    });
-  });
+  return true;
 }
 #endif
 
@@ -7084,8 +7098,9 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
                                P->vectorFactors().end());
 
     SmallVector<VPRegisterUsage, 8> RUs;
-    if (CM.useMaxBandwidth(TargetTransformInfo::RGK_ScalableVector) ||
-        CM.useMaxBandwidth(TargetTransformInfo::RGK_FixedWidthVector))
+    if (any_of(VFs, [this](ElementCount VF) {
+          return CM.shouldConsiderRegPressureForVF(VF);
+        }))
       RUs = calculateRegisterUsageForPlan(*P, VFs, TTI, CM.ValuesToIgnore);
 
     for (unsigned I = 0; I < VFs.size(); I++) {
@@ -7111,7 +7126,8 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
       InstructionCost Cost = cost(*P, VF);
       VectorizationFactor CurrentFactor(VF, Cost, ScalarCost);
 
-      if (CM.useMaxBandwidth(VF) && RUs[I].exceedsMaxNumRegs(TTI)) {
+      if (CM.shouldConsiderRegPressureForVF(VF) &&
+          RUs[I].exceedsMaxNumRegs(TTI, ForceTargetNumVectorRegs)) {
         LLVM_DEBUG(dbgs() << "LV(REG): Not considering vector loop of width "
                           << VF << " because it uses too many registers\n");
         continue;
@@ -8403,7 +8419,6 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
       bool HasScalarVF = Plan->hasScalarVFOnly();
       // Now optimize the initial VPlan.
       VPlanTransforms::hoistPredicatedLoads(*Plan, PSE, OrigLoop);
-      VPlanTransforms::sinkPredicatedStores(*Plan, PSE, OrigLoop);
       if (!HasScalarVF)
         VPlanTransforms::runPass(VPlanTransforms::truncateToMinimalBitwidths,
                                  *Plan, CM.getMinimalBitwidths());

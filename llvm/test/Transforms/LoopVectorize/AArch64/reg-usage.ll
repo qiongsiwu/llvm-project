@@ -48,6 +48,7 @@ define void @load_and_compare_only_used_by_assume(ptr %a, ptr noalias %b) {
 ; CHECK-NEXT: LV(REG): RegisterClass: Generic::ScalarRC, 3 registers
 ; CHECK-NEXT: LV(REG): RegisterClass: Generic::VectorRC, 1 registers
 ; CHECK-NEXT: LV(REG): Found invariant usage: 1 item
+; CHECK-NEXT: LV(REG): RegisterClass: Generic::ScalarRC, 1 registers
 
 entry:
   br label %loop
@@ -70,12 +71,13 @@ exit:
 }
 
 define dso_local void @dotp_high_register_pressure(ptr %a, ptr %b, ptr %sum, i32 %n) #1 {
-; CHECK-LABEL: LV: Checking a loop in 'dotp_high_register_pressure' from <stdin>
+; CHECK-LABEL: LV: Checking a loop in 'dotp_high_register_pressure'
 ; CHECK:       LV(REG): VF = 16
 ; CHECK-NEXT:  LV(REG): Found max usage: 2 item
 ; CHECK-NEXT:  LV(REG): RegisterClass: Generic::ScalarRC, 3 registers
 ; CHECK-NEXT:  LV(REG): RegisterClass: Generic::VectorRC, 48 registers
 ; CHECK-NEXT:  LV(REG): Found invariant usage: 1 item
+; CHECK-NEXT:  LV(REG): RegisterClass: Generic::ScalarRC, 1 registers
 entry:
   %cmp100 = icmp sgt i32 %n, 0
   br i1 %cmp100, label %for.body.lr.ph, label %for.cond.cleanup
@@ -188,12 +190,13 @@ for.body:                                         ; preds = %for.body.lr.ph, %fo
 }
 
 define i32 @dotp_unrolled(i32 %num_out, i64 %num_in, ptr %a, ptr %b) {
-; CHECK-LABEL: LV: Checking a loop in 'dotp_unrolled' from <stdin>
+; CHECK-LABEL: LV: Checking a loop in 'dotp_unrolled'
 ; CHECK:       LV(REG): VF = 16
 ; CHECK-NEXT:  LV(REG): Found max usage: 2 item
 ; CHECK-NEXT:  LV(REG): RegisterClass: Generic::ScalarRC, 9 registers
 ; CHECK-NEXT:  LV(REG): RegisterClass: Generic::VectorRC, 24 registers
 ; CHECK-NEXT:  LV(REG): Found invariant usage: 1 item
+; CHECK-NEXT:  LV(REG): RegisterClass: Generic::ScalarRC, 1 registers
 entry:
   br label %for.body
 
