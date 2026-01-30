@@ -43,7 +43,8 @@ public:
   static llvm::Expected<TestFile> fromYamlFile(const llvm::Twine &Name);
 
   ModuleSpec moduleSpec() {
-    return ModuleSpec(FileSpec(), UUID(), dataBuffer());
+    return ModuleSpec(FileSpec(), UUID(),
+                      std::make_shared<DataExtractor>(dataBuffer()));
   }
 
   llvm::Expected<llvm::sys::fs::TempFile> writeToTemporaryFile();
