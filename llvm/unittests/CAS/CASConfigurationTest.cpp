@@ -23,7 +23,7 @@ TEST(CASConfigurationTest, roundTrips) {
     ASSERT_THAT_ERROR(
         CASConfiguration::createFromConfig(Serialized).moveInto(NewConfig),
         Succeeded());
-    ASSERT_TRUE(Config == *NewConfig);
+    EXPECT_EQ(Config, *NewConfig);
   };
 
   CASConfiguration Config;
@@ -53,11 +53,12 @@ TEST(CASConfigurationTest, configFileSearch) {
 
   VFS->addFile("/a/b/c/d/.cas-config", 0,
                llvm::MemoryBuffer::getMemBufferCopy("{\"CASPath\": \"/tmp\"}"));
+
   CASConfiguration Config;
   Config.CASPath = "/tmp";
   auto NewConfig =
       CASConfiguration::createFromSearchConfigFile("/a/b/c/d/e", VFS);
   ASSERT_TRUE(NewConfig);
-  ASSERT_TRUE(NewConfig->first == "/a/b/c/d/.cas-config");
-  ASSERT_TRUE(Config == NewConfig->second);
+  EXPECT_EQ(NewConfig->first, "/a/b/c/d/.cas-config");
+  EXPECT_EQ(Config, NewConfig->second);
 }
