@@ -852,7 +852,8 @@ cond.end:
 ; computeKnownBits doesn't lose this.
 define i32 @abs_range_metadata(i32 %x) {
 ; CHECK-LABEL: @abs_range_metadata(
-; CHECK-NEXT:    [[B:%.*]] = call i32 @llvm.abs.i32(i32 [[X:%.*]], i1 false), !range [[RNG0:![0-9]+]]
+; CHECK-NEXT:    [[A:%.*]] = call i32 @llvm.abs.i32(i32 [[X:%.*]], i1 false), !range [[RNG0:![0-9]+]]
+; CHECK-NEXT:    [[B:%.*]] = and i32 [[A]], 15
 ; CHECK-NEXT:    ret i32 [[B]]
 ;
   %a = call i32 @llvm.abs.i32(i32 %x, i1 false), !range !1
@@ -865,7 +866,9 @@ define i32 @abs_range_metadata(i32 %x) {
 define i32 @abs_diff(i32 %x, i32 %y) {
 ; CHECK-LABEL: @abs_diff(
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[X:%.*]], [[Y:%.*]]
-; CHECK-NEXT:    [[COND:%.*]] = call i32 @llvm.abs.i32(i32 [[SUB]], i1 false)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[SUB1:%.*]] = sub i32 0, [[SUB]]
+; CHECK-NEXT:    [[COND:%.*]] = select i1 [[CMP]], i32 [[SUB]], i32 [[SUB1]]
 ; CHECK-NEXT:    ret i32 [[COND]]
 ;
   %sub = sub nsw i32 %x, %y
@@ -923,7 +926,9 @@ define i32 @abs_diff_neg_no_nsw(i32 %x, i32 %y) {
 define i32 @abs_diff_ge(i32 %x, i32 %y) {
 ; CHECK-LABEL: @abs_diff_ge(
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[X:%.*]], [[Y:%.*]]
-; CHECK-NEXT:    [[COND:%.*]] = call i32 @llvm.abs.i32(i32 [[SUB]], i1 false)
+; CHECK-NEXT:    [[CMP_NOT:%.*]] = icmp slt i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[SUB1:%.*]] = sub i32 0, [[SUB]]
+; CHECK-NEXT:    [[COND:%.*]] = select i1 [[CMP_NOT]], i32 [[SUB1]], i32 [[SUB]]
 ; CHECK-NEXT:    ret i32 [[COND]]
 ;
   %sub = sub nsw i32 %x, %y
@@ -936,7 +941,9 @@ define i32 @abs_diff_ge(i32 %x, i32 %y) {
 define i32 @abs_diff_slt_commute(i32 %x, i32 %y) {
 ; CHECK-LABEL: @abs_diff_slt_commute(
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[X:%.*]], [[Y:%.*]]
-; CHECK-NEXT:    [[COND:%.*]] = call i32 @llvm.abs.i32(i32 [[SUB]], i1 false)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[Y]], [[X]]
+; CHECK-NEXT:    [[SUB1:%.*]] = sub i32 0, [[SUB]]
+; CHECK-NEXT:    [[COND:%.*]] = select i1 [[CMP]], i32 [[SUB]], i32 [[SUB1]]
 ; CHECK-NEXT:    ret i32 [[COND]]
 ;
   %sub = sub nsw i32 %x, %y
@@ -949,7 +956,9 @@ define i32 @abs_diff_slt_commute(i32 %x, i32 %y) {
 define i32 @abs_diff_sge_same(i32 %x, i32 %y) {
 ; CHECK-LABEL: @abs_diff_sge_same(
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[X:%.*]], [[Y:%.*]]
-; CHECK-NEXT:    [[COND:%.*]] = call i32 @llvm.abs.i32(i32 [[SUB]], i1 false)
+; CHECK-NEXT:    [[CMP_NOT:%.*]] = icmp slt i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[SUB1:%.*]] = sub i32 0, [[SUB]]
+; CHECK-NEXT:    [[COND:%.*]] = select i1 [[CMP_NOT]], i32 [[SUB1]], i32 [[SUB]]
 ; CHECK-NEXT:    ret i32 [[COND]]
 ;
   %sub = sub nsw i32 %x, %y
@@ -962,7 +971,9 @@ define i32 @abs_diff_sge_same(i32 %x, i32 %y) {
 define i32 @abs_diff_sle_inverted(i32 %x, i32 %y) {
 ; CHECK-LABEL: @abs_diff_sle_inverted(
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[X:%.*]], [[Y:%.*]]
-; CHECK-NEXT:    [[COND:%.*]] = call i32 @llvm.abs.i32(i32 [[SUB]], i1 false)
+; CHECK-NEXT:    [[CMP_NOT:%.*]] = icmp sgt i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[SUB1:%.*]] = sub i32 0, [[SUB]]
+; CHECK-NEXT:    [[COND:%.*]] = select i1 [[CMP_NOT]], i32 [[SUB]], i32 [[SUB1]]
 ; CHECK-NEXT:    ret i32 [[COND]]
 ;
   %sub = sub nsw i32 %x, %y
@@ -975,7 +986,9 @@ define i32 @abs_diff_sle_inverted(i32 %x, i32 %y) {
 define i32 @abs_diff_sle_commute(i32 %x, i32 %y) {
 ; CHECK-LABEL: @abs_diff_sle_commute(
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[X:%.*]], [[Y:%.*]]
-; CHECK-NEXT:    [[COND:%.*]] = call i32 @llvm.abs.i32(i32 [[SUB]], i1 false)
+; CHECK-NEXT:    [[CMP_NOT:%.*]] = icmp sgt i32 [[Y]], [[X]]
+; CHECK-NEXT:    [[SUB1:%.*]] = sub i32 0, [[SUB]]
+; CHECK-NEXT:    [[COND:%.*]] = select i1 [[CMP_NOT]], i32 [[SUB1]], i32 [[SUB]]
 ; CHECK-NEXT:    ret i32 [[COND]]
 ;
   %sub = sub nsw i32 %x, %y
@@ -988,7 +1001,9 @@ define i32 @abs_diff_sle_commute(i32 %x, i32 %y) {
 define i8 @abs_diff_sle_y_x(i8 %x, i8 %y) {
 ; CHECK-LABEL: @abs_diff_sle_y_x(
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i8 [[X:%.*]], [[Y:%.*]]
-; CHECK-NEXT:    [[COND:%.*]] = call i8 @llvm.abs.i8(i8 [[SUB]], i1 false)
+; CHECK-NEXT:    [[CMP_NOT:%.*]] = icmp sgt i8 [[Y]], [[X]]
+; CHECK-NEXT:    [[SUB1:%.*]] = sub i8 0, [[SUB]]
+; CHECK-NEXT:    [[COND:%.*]] = select i1 [[CMP_NOT]], i8 [[SUB1]], i8 [[SUB]]
 ; CHECK-NEXT:    ret i8 [[COND]]
 ;
   %sub = sub nsw i8 %x, %y
