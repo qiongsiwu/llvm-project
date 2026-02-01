@@ -9,8 +9,8 @@
 #ifndef LLVM_CAS_UNIFIEDONDISKCACHE_H
 #define LLVM_CAS_UNIFIEDONDISKCACHE_H
 
-#include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/OnDiskGraphDB.h"
+#include "llvm/CAS/ValidationResult.h"
 
 namespace llvm::cas::ondisk {
 
@@ -41,6 +41,9 @@ class UnifiedOnDiskCache {
 public:
   /// The \p OnDiskGraphDB instance for the open directory.
   OnDiskGraphDB &getGraphDB() { return *PrimaryGraphDB; }
+
+  /// The \p OnDiskGraphDB instance for the open directory.
+  const OnDiskGraphDB &getGraphDB() const { return *PrimaryGraphDB; }
 
   /// Associate an \p ObjectID, of the \p OnDiskGraphDB instance, with a key.
   ///
@@ -108,7 +111,8 @@ public:
   /// in an invalid state because \p AllowRecovery is false.
   static Expected<ValidationResult>
   validateIfNeeded(StringRef Path, StringRef HashName, unsigned HashByteSize,
-                   bool CheckHash, bool AllowRecovery, bool ForceValidation,
+                   bool CheckHash, OnDiskGraphDB::HashingFuncT HashFn,
+                   bool AllowRecovery, bool ForceValidation,
                    std::optional<StringRef> LLVMCasBinary);
 
   /// This is called implicitly at destruction time, so it is not required for a

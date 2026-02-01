@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CAS/UnifiedOnDiskCache.h"
+#include "CASTestConfig.h"
 #include "OnDiskCommonUtils.h"
 #include "llvm/Testing/Support/Error.h"
 #include "llvm/Testing/Support/SupportHelpers.h"
@@ -43,25 +44,29 @@ static Expected<size_t> countFileSizes(StringRef Path) {
   return TotalSize;
 }
 
-TEST(UnifiedOnDiskCacheTest, Basic) {
+TEST_P(CustomHasherOnDiskCASTest, UnifiedOnDiskCacheTest) {
+  auto HashFn = GetParam().HashFn;
+  StringRef HashName = GetParam().HashName;
+  size_t HashSize = GetParam().HashSize;
+
   unittest::TempDir Temp("ondisk-unified", /*Unique=*/true);
   std::unique_ptr<UnifiedOnDiskCache> UniDB;
 
   const uint64_t SizeLimit = 1024ull * 64;
   auto reopenDB = [&]() {
     UniDB.reset();
-    ASSERT_THAT_ERROR(UnifiedOnDiskCache::open(Temp.path(), SizeLimit, "blake3",
-                                               sizeof(HashType))
-                          .moveInto(UniDB),
-                      Succeeded());
+    ASSERT_THAT_ERROR(
+        UnifiedOnDiskCache::open(Temp.path(), SizeLimit, HashName, HashSize)
+            .moveInto(UniDB),
+        Succeeded());
   };
 
   reopenDB();
 
-  HashType RootHash;
-  HashType OtherHash;
-  HashType Key1Hash;
-  HashType Key2Hash;
+  HashType RootHash(HashSize);
+  HashType OtherHash(HashSize);
+  HashType Key1Hash(HashSize);
+  HashType Key2Hash(HashSize);
   {
     OnDiskGraphDB &DB = UniDB->getGraphDB();
     std::optional<ObjectID> ID1;
@@ -120,6 +125,17 @@ TEST(UnifiedOnDiskCacheTest, Basic) {
   checkTree(OtherHash, "other\n");
   checkKey(Key1Hash, "root");
   checkKey(Key2Hash, "1");
+
+  ASSERT_THAT_ERROR(UniDB->validateActionCache(), Succeeded());
+  std::optional<ValidationResult> ValidationRes;
+  ASSERT_THAT_ERROR(UnifiedOnDiskCache::validateIfNeeded(
+                        Temp.path(), HashName, HashSize, /*CheckHash=*/true,
+                        HashFn, /*AllowRecovery=*/false,
+                        /*ForceValidation=*/true,
+                        /*LLVMCasBinary=*/std::nullopt)
+                        .moveInto(ValidationRes),
+                    Succeeded());
+  ASSERT_EQ(ValidationRes, ValidationResult::Valid);
 
   auto storeBigObject = [&](unsigned Index) {
     SmallString<1000> Buf;

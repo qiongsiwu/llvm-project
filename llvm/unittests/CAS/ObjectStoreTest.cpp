@@ -18,6 +18,7 @@
 
 using namespace llvm;
 using namespace llvm::cas;
+using namespace llvm::unittest::cas;
 
 TEST_P(CASTest, PrintIDs) {
   std::shared_ptr<ObjectStore> CAS = createObjectStore();
