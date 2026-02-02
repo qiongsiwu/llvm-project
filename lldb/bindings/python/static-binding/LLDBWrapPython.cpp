@@ -77543,12 +77543,12 @@ SWIGINTERN PyObject *_wrap_SBThread_GetFrames(PyObject *self, PyObject *args) {
   swig_obj[0] = args;
   res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_lldb__SBThread, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "SBThread_GetFrames" "', argument " "1"" of type '" "lldb::SBThread *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "SBThread_GetFrames" "', argument " "1"" of type '" "lldb::SBThread const *""'"); 
   }
   arg1 = reinterpret_cast< lldb::SBThread * >(argp1);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    result = (arg1)->GetFrames();
+    result = ((lldb::SBThread const *)arg1)->GetFrames();
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   resultobj = SWIG_NewPointerObj((new lldb::SBFrameList(result)), SWIGTYPE_p_lldb__SBFrameList, SWIG_POINTER_OWN |  0 );
