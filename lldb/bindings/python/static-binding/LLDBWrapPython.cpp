@@ -104991,7 +104991,7 @@ static swig_type_info _swigt__p_std__weak_ptrT_lldb_private__TypeSystem_t = {"_p
 static swig_type_info _swigt__p_std__weak_ptrT_lldb_private__Type_t = {"_p_std__weak_ptrT_lldb_private__Type_t", "lldb::TypeWP *|std::weak_ptr< lldb_private::Type > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_std__weak_ptrT_lldb_private__UnixSignals_t = {"_p_std__weak_ptrT_lldb_private__UnixSignals_t", "lldb::UnixSignalsWP *|std::weak_ptr< lldb_private::UnixSignals > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_unsigned_char = {"_p_unsigned_char", "uint8_t *|uint_fast8_t *|uint_least8_t *|unsigned char *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_unsigned_int = {"_p_unsigned_int", "lldb::cpu_id_t *|lldb::wp_resource_id_t *|uint32_t *|uint_fast16_t *|uint_fast32_t *|uint_least32_t *|uintptr_t *|unsigned int *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_unsigned_int = {"_p_unsigned_int", "lldb::cpu_id_t *|lldb::frame_list_id_t *|lldb::wp_resource_id_t *|uint32_t *|uint_fast16_t *|uint_fast32_t *|uint_least32_t *|uintptr_t *|unsigned int *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_unsigned_long_long = {"_p_unsigned_long_long", "lldb::addr_t *|lldb::offset_t *|lldb::pid_t *|lldb::process_t *|lldb::queue_id_t *|lldb::tid_t *|lldb::user_id_t *|uint64_t *|uint_fast64_t *|uint_least64_t *|uintmax_t *|unsigned long long *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_unsigned_short = {"_p_unsigned_short", "uint16_t *|uint_least16_t *|unsigned short *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_void = {"_p_void", "void *", 0, 0, (void*)0, 0};
@@ -106483,6 +106483,7 @@ SWIGINTERN int SWIG_mod_exec(PyObject *m) {
   SWIG_Python_SetConstant(d, "LLDB_INVALID_PROCESS_ID",SWIG_From_int(static_cast< int >(0)));
   SWIG_Python_SetConstant(d, "LLDB_INVALID_THREAD_ID",SWIG_From_int(static_cast< int >(0)));
   SWIG_Python_SetConstant(d, "LLDB_INVALID_FRAME_ID",SWIG_From_unsigned_SS_int(static_cast< unsigned int >(4294967295U)));
+  SWIG_Python_SetConstant(d, "LLDB_UNWINDER_FRAME_LIST_ID",SWIG_From_int(static_cast< int >(0)));
   SWIG_Python_SetConstant(d, "LLDB_INVALID_SIGNAL_NUMBER",SWIG_From_int(static_cast< int >(2147483647)));
   SWIG_Python_SetConstant(d, "LLDB_INVALID_OFFSET",SWIG_From_unsigned_SS_long_SS_long(static_cast< unsigned long long >(18446744073709551615ULL)));
   SWIG_Python_SetConstant(d, "LLDB_INVALID_LINE_NUMBER",SWIG_From_unsigned_SS_int(static_cast< unsigned int >(4294967295U)));
