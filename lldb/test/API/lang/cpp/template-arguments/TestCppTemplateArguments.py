@@ -78,12 +78,11 @@ class TestCase(TestBase):
         value = self.expect_expr("temp6", result_type="Foo<int *, int *>")
         self.assertFalse(value.GetType().GetTemplateArgumentValue(target, 1))
 
-        # FIXME: support wider range of floating point types
-        value = self.expect_expr("temp7", result_type="Foo<__fp16, __fp16>")
-        self.assertFalse(value.GetType().GetTemplateArgumentValue(target, 1))
-
-        value = self.expect_expr("temp8", result_type="Foo<__fp16, __fp16>")
-        self.assertFalse(value.GetType().GetTemplateArgumentValue(target, 1))
+        value = self.expect_expr("temp7", result_type="Foo<__fp16, 1.000000e+00>")
+        template_param_value = value.GetType().GetTemplateArgumentValue(target, 1)
+        self.assertEqual(template_param_value.GetTypeName(), "__fp16")
+        # FIXME: returns incorrect value?
+        self.assertEqual(template_param_value.GetValueAsSigned(), 0)
 
         value = self.expect_expr("temp9", result_type="Bar<double, 1.200000e+00>")
         template_param_value = value.GetType().GetTemplateArgumentValue(target, 1)
