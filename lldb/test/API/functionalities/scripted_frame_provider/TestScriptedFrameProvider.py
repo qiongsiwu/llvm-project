@@ -789,6 +789,7 @@ class ScriptedFrameProviderTestCase(TestBase):
         varp1 = frame0.GetValueForVariablePath("variable_in_main + 1")
         self.assertEqual(varp1.unsigned, 124)
 
+
     def test_frame_validity_after_step(self):
         """Test that SBFrame references from ScriptedFrameProvider remain valid after stepping.
 
