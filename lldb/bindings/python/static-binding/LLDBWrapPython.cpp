@@ -3659,50 +3659,51 @@ SWIG_Python_NonDynamicSetAttr(PyObject *obj, PyObject *name, PyObject *value) {
 #define SWIGTYPE_p_std__shared_ptrT_lldb_private__Watchpoint_t swig_types[218]
 #define SWIGTYPE_p_std__shared_ptrT_lldb_private__WritableDataBuffer_t swig_types[219]
 #define SWIGTYPE_p_std__unique_ptrT_lldb_private__AddressRange_t swig_types[220]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t swig_types[221]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__DynamicLoader_t swig_types[222]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__File_t swig_types[223]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__JITLoaderList_t swig_types[224]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__MemoryRegionInfo_t swig_types[225]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__OperatingSystem_t swig_types[226]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__ProtocolServer_t swig_types[227]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__ScriptedPlatformInterface_t swig_types[228]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__ScriptedProcessInterface_t swig_types[229]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SectionList_t swig_types[230]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SourceManager_t swig_types[231]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__StackFrameRecognizerManager_t swig_types[232]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__Stream_t swig_types[233]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__StructuredDataImpl_t swig_types[234]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SymbolVendor_t swig_types[235]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SystemRuntime_t swig_types[236]
-#define SWIGTYPE_p_std__unique_ptrT_lldb_private__TraceExporter_t swig_types[237]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__BreakpointLocation_t swig_types[238]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Breakpoint_t swig_types[239]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__BroadcasterManager_t swig_types[240]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Debugger_t swig_types[241]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Listener_t swig_types[242]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Module_t swig_types[243]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__ObjectFileJITDelegate_t swig_types[244]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__OptionValue_t swig_types[245]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Process_t swig_types[246]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Queue_t swig_types[247]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Section_t swig_types[248]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__StackFrameList_t swig_types[249]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__StackFrame_t swig_types[250]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__StructuredDataPlugin_t swig_types[251]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Target_t swig_types[252]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__ThreadPlan_t swig_types[253]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Thread_t swig_types[254]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__TypeSystem_t swig_types[255]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Type_t swig_types[256]
-#define SWIGTYPE_p_std__weak_ptrT_lldb_private__UnixSignals_t swig_types[257]
-#define SWIGTYPE_p_unsigned_char swig_types[258]
-#define SWIGTYPE_p_unsigned_int swig_types[259]
-#define SWIGTYPE_p_unsigned_long_long swig_types[260]
-#define SWIGTYPE_p_unsigned_short swig_types[261]
-#define SWIGTYPE_p_void swig_types[262]
-static swig_type_info *swig_types[264];
-static swig_module_info swig_module = {swig_types, 263, 0, 0, 0, 0};
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__DataExtractor_t swig_types[221]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t swig_types[222]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__DynamicLoader_t swig_types[223]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__File_t swig_types[224]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__JITLoaderList_t swig_types[225]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__MemoryRegionInfo_t swig_types[226]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__OperatingSystem_t swig_types[227]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__ProtocolServer_t swig_types[228]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__ScriptedPlatformInterface_t swig_types[229]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__ScriptedProcessInterface_t swig_types[230]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SectionList_t swig_types[231]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SourceManager_t swig_types[232]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__StackFrameRecognizerManager_t swig_types[233]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__Stream_t swig_types[234]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__StructuredDataImpl_t swig_types[235]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SymbolVendor_t swig_types[236]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__SystemRuntime_t swig_types[237]
+#define SWIGTYPE_p_std__unique_ptrT_lldb_private__TraceExporter_t swig_types[238]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__BreakpointLocation_t swig_types[239]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Breakpoint_t swig_types[240]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__BroadcasterManager_t swig_types[241]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Debugger_t swig_types[242]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Listener_t swig_types[243]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Module_t swig_types[244]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__ObjectFileJITDelegate_t swig_types[245]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__OptionValue_t swig_types[246]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Process_t swig_types[247]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Queue_t swig_types[248]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Section_t swig_types[249]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__StackFrameList_t swig_types[250]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__StackFrame_t swig_types[251]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__StructuredDataPlugin_t swig_types[252]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Target_t swig_types[253]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__ThreadPlan_t swig_types[254]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Thread_t swig_types[255]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__TypeSystem_t swig_types[256]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__Type_t swig_types[257]
+#define SWIGTYPE_p_std__weak_ptrT_lldb_private__UnixSignals_t swig_types[258]
+#define SWIGTYPE_p_unsigned_char swig_types[259]
+#define SWIGTYPE_p_unsigned_int swig_types[260]
+#define SWIGTYPE_p_unsigned_long_long swig_types[261]
+#define SWIGTYPE_p_unsigned_short swig_types[262]
+#define SWIGTYPE_p_void swig_types[263]
+static swig_type_info *swig_types[265];
+static swig_module_info swig_module = {swig_types, 264, 0, 0, 0, 0};
 #define SWIG_TypeQuery(name) SWIG_TypeQueryModule(&swig_module, &swig_module, name)
 #define SWIG_MangledTypeQuery(name) SWIG_MangledTypeQueryModule(&swig_module, &swig_module, name)
 
@@ -5601,6 +5602,18 @@ void *lldb_private::python::LLDBSWIGPython_CastPyObjectToSBValue(PyObject * data
 
   int valid_cast =
       SWIG_ConvertPtr(data, (void **)&sb_ptr, SWIGTYPE_p_lldb__SBValue, 0);
+
+  if (valid_cast == -1)
+    return NULL;
+
+  return sb_ptr;
+}
+
+void *lldb_private::python::LLDBSWIGPython_CastPyObjectToSBValueList(PyObject * data) {
+  lldb::SBValueList *sb_ptr = NULL;
+
+  int valid_cast =
+      SWIG_ConvertPtr(data, (void **)&sb_ptr, SWIGTYPE_p_lldb__SBValueList, 0);
 
   if (valid_cast == -1)
     return NULL;
@@ -104953,6 +104966,7 @@ static swig_type_info _swigt__p_std__shared_ptrT_lldb_private__WatchpointResourc
 static swig_type_info _swigt__p_std__shared_ptrT_lldb_private__Watchpoint_t = {"_p_std__shared_ptrT_lldb_private__Watchpoint_t", "lldb::WatchpointSP *|std::shared_ptr< lldb_private::Watchpoint > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_std__shared_ptrT_lldb_private__WritableDataBuffer_t = {"_p_std__shared_ptrT_lldb_private__WritableDataBuffer_t", "lldb::WritableDataBufferSP *|std::shared_ptr< lldb_private::WritableDataBuffer > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_std__unique_ptrT_lldb_private__AddressRange_t = {"_p_std__unique_ptrT_lldb_private__AddressRange_t", "lldb::AddressRangeUP *|std::unique_ptr< lldb_private::AddressRange > *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_std__unique_ptrT_lldb_private__DataExtractor_t = {"_p_std__unique_ptrT_lldb_private__DataExtractor_t", "lldb::DataExtractorUP *|std::unique_ptr< lldb_private::DataExtractor > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t = {"_p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t", "lldb::DynamicCheckerFunctionsUP *|std::unique_ptr< lldb_private::DynamicCheckerFunctions > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_std__unique_ptrT_lldb_private__DynamicLoader_t = {"_p_std__unique_ptrT_lldb_private__DynamicLoader_t", "lldb::DynamicLoaderUP *|std::unique_ptr< lldb_private::DynamicLoader > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_std__unique_ptrT_lldb_private__File_t = {"_p_std__unique_ptrT_lldb_private__File_t", "lldb::FileUP *|std::unique_ptr< lldb_private::File > *", 0, 0, (void*)0, 0};
@@ -105218,6 +105232,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_std__shared_ptrT_lldb_private__Watchpoint_t,
   &_swigt__p_std__shared_ptrT_lldb_private__WritableDataBuffer_t,
   &_swigt__p_std__unique_ptrT_lldb_private__AddressRange_t,
+  &_swigt__p_std__unique_ptrT_lldb_private__DataExtractor_t,
   &_swigt__p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t,
   &_swigt__p_std__unique_ptrT_lldb_private__DynamicLoader_t,
   &_swigt__p_std__unique_ptrT_lldb_private__File_t,
@@ -105483,6 +105498,7 @@ static swig_cast_info _swigc__p_std__shared_ptrT_lldb_private__WatchpointResourc
 static swig_cast_info _swigc__p_std__shared_ptrT_lldb_private__Watchpoint_t[] = {  {&_swigt__p_std__shared_ptrT_lldb_private__Watchpoint_t, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_std__shared_ptrT_lldb_private__WritableDataBuffer_t[] = {  {&_swigt__p_std__shared_ptrT_lldb_private__WritableDataBuffer_t, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_std__unique_ptrT_lldb_private__AddressRange_t[] = {  {&_swigt__p_std__unique_ptrT_lldb_private__AddressRange_t, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_std__unique_ptrT_lldb_private__DataExtractor_t[] = {  {&_swigt__p_std__unique_ptrT_lldb_private__DataExtractor_t, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t[] = {  {&_swigt__p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_std__unique_ptrT_lldb_private__DynamicLoader_t[] = {  {&_swigt__p_std__unique_ptrT_lldb_private__DynamicLoader_t, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_std__unique_ptrT_lldb_private__File_t[] = {  {&_swigt__p_std__unique_ptrT_lldb_private__File_t, 0, 0, 0},{0, 0, 0, 0}};
@@ -105748,6 +105764,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_std__shared_ptrT_lldb_private__Watchpoint_t,
   _swigc__p_std__shared_ptrT_lldb_private__WritableDataBuffer_t,
   _swigc__p_std__unique_ptrT_lldb_private__AddressRange_t,
+  _swigc__p_std__unique_ptrT_lldb_private__DataExtractor_t,
   _swigc__p_std__unique_ptrT_lldb_private__DynamicCheckerFunctions_t,
   _swigc__p_std__unique_ptrT_lldb_private__DynamicLoader_t,
   _swigc__p_std__unique_ptrT_lldb_private__File_t,
