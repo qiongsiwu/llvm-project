@@ -1,3 +1,9 @@
+set(SWIFT_SOURCES PdbAstBuilderSwift.cpp)
+set(LLVM_OPTIONAL_SOURCES ${SWIFT_SOURCES})
+if (NOT LLDB_ENABLE_SWIFT_SUPPORT)
+  unset(SWIFT_SOURCES)
+endif()
+
 add_lldb_library(lldbPluginSymbolFileNativePDB
   CodeViewRegisterMapping.cpp
   CompileUnitIndex.cpp
@@ -9,6 +15,9 @@ add_lldb_library(lldbPluginSymbolFileNativePDB
   PdbUtil.cpp
   SymbolFileNativePDB.cpp
   UdtRecordCompleter.cpp
+  ## BEGIN SWIFT
+  ${SWIFT_SOURCES}
+  ##END SWIFT
 
   LINK_COMPONENTS
     DebugInfoCodeView
