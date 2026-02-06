@@ -5455,7 +5455,6 @@ Process::RunThreadPlan(ExecutionContext &exe_ctx,
   lldb::StateType old_state = eStateInvalid;
   lldb::ThreadPlanSP stopper_base_plan_sp;
 
-  Log *log(GetLog(LLDBLog::Step | LLDBLog::Process));
   if (m_current_private_state_thread->IsOnThread(Host::GetCurrentThread())) {
     // Yikes, we are running on the private state thread!  So we can't wait for
     // public events on this thread, since we are the thread that is generating
