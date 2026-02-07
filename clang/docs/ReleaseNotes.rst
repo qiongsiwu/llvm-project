@@ -1074,6 +1074,7 @@ Bug Fixes to AST Handling
 - The ODR checker now correctly hashes the names of conversion operators. (#GH143152)
 - Fixed the right parenthesis source location of ``CXXTemporaryObjectExpr``. (#GH143711)
 - Fixed a crash when performing an ``IgnoreUnlessSpelledInSource`` traversal of ASTs containing ``catch(...)`` statements. (#GH146103)
+- Fixed a bug where explicit nullability property attributes were not stored in AST nodes in Objective-C. (#GH179703)
 
 Miscellaneous Bug Fixes
 ^^^^^^^^^^^^^^^^^^^^^^^
