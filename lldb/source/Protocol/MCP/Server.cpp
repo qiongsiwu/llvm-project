@@ -8,6 +8,7 @@
 
 #include "lldb/Protocol/MCP/Server.h"
 #include "lldb/Protocol/MCP/MCPError.h"
+#include "llvm/Support/ErrorExtras.h"
 
 using namespace lldb_protocol::mcp;
 using namespace llvm;
@@ -162,7 +163,7 @@ llvm::Expected<Response> Server::ToolsCallHandler(const Request &request) {
 
   auto it = m_tools.find(tool_name);
   if (it == m_tools.end())
-    return llvm::createStringError(llvm::formatv("no tool \"{0}\"", tool_name));
+    return llvm::createStringErrorV("no tool \"{0}\"", tool_name);
 
   ToolArguments tool_args;
   if (const json::Value *args = param_obj->get("arguments"))
