@@ -262,6 +262,19 @@ public:
   LLVM_ABI_FOR_TEST Error store(ObjectID ID, ArrayRef<ObjectID> Refs,
                                 ArrayRef<char> Data);
 
+  /// Associates the data of a file with a particular object ID. If there is
+  /// already a record for this object the operation is a no-op.
+  ///
+  /// This is more than a convenience variant of \c store(), \c storeFile() can
+  /// perform optimizations that reduce I/O and disk space consumption.
+  ///
+  /// If there are any concurrent modifications to the file, the contents in the
+  /// CAS may be corrupt.
+  ///
+  /// \param ID the object ID to associate the data with.
+  /// \param FilePath the path of the file data.
+  LLVM_ABI_FOR_TEST Error storeFile(ObjectID ID, StringRef FilePath);
+
   /// \returns \p nullopt if the object associated with \p Ref does not exist.
   LLVM_ABI_FOR_TEST Expected<std::optional<ObjectHandle>> load(ObjectID Ref);
 
@@ -304,6 +317,31 @@ public:
     InternalRefArrayRef Refs = getInternalRefs(Node);
     return make_range(Refs.begin(), Refs.end());
   }
+
+  /// Encapsulates file info for an underlying object node.
+  struct FileBackedData {
+    /// The data of the object node.
+    ArrayRef<char> Data;
+
+    struct FileInfoTy {
+      /// The file path of the object node.
+      std::string FilePath;
+      /// Whether the file of the object leaf node has an extra nul appended at
+      /// the end. If the file is copied the extra nul needs to be removed.
+      bool IsFileNulTerminated;
+    };
+    /// File information for the object, if available.
+    std::optional<FileInfoTy> FileInfo;
+  };
+
+  /// Provides access to the underlying file path, that represents an object
+  /// leaf node, when available.
+  ///
+  /// This enables reducing I/O and disk space consumption, i.e. instead of
+  /// loading the data in memory and then writing it to a file, the client could
+  /// clone the underlying file directly. The client *must not* write to or
+  /// delete the underlying file, the path is provided only for reading/copying.
+  FileBackedData getInternalFileBackedObjectData(ObjectHandle Node) const;
 
   /// \returns Total size of stored objects.
   ///
@@ -376,14 +414,23 @@ private:
   Expected<std::optional<ObjectHandle>> faultInFromUpstream(ObjectID PrimaryID);
   Error importFullTree(ObjectID PrimaryID, ObjectHandle UpstreamNode);
   Error importSingleNode(ObjectID PrimaryID, ObjectHandle UpstreamNode);
+  Error importUpstreamData(ObjectID PrimaryID, ArrayRef<ObjectID> PrimaryRefs,
+                           ObjectHandle UpstreamNode);
+
+  enum class InternalUpstreamImportKind { Leaf, Leaf0 };
+  /// Private \c storeFile than optimizes internal upstream database imports.
+  Error storeFile(ObjectID ID, StringRef FilePath,
+                  std::optional<InternalUpstreamImportKind> ImportKind);
 
   Expected<IndexProxy> indexHash(ArrayRef<uint8_t> Hash);
 
+  /// Get path for creating standalone data file.
+  void getStandalonePath(StringRef FileSuffix, FileOffset IndexOffset,
+                         SmallVectorImpl<char> &Path) const;
+  /// Create a standalone leaf file.
   Error createStandaloneLeaf(IndexProxy &I, ArrayRef<char> Data);
 
   Expected<MappedTempFile> createTempFile(StringRef FinalPath, uint64_t Size);
-
-  OnDiskContent getContentFromHandle(ObjectHandle H) const;
 
   static InternalRef getInternalRef(ObjectID Ref) {
     return InternalRef::getFromRawData(Ref.getOpaqueData());
@@ -393,9 +440,6 @@ private:
   }
 
   static ObjectID getExternalReference(const IndexProxy &I);
-
-  void getStandalonePath(StringRef FileSuffix, const IndexProxy &I,
-                         SmallVectorImpl<char> &Path) const;
 
   LLVM_ABI_FOR_TEST ArrayRef<uint8_t>
   getDigest(InternalRef Ref) const;
