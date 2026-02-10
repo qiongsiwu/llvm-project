@@ -520,7 +520,7 @@ let Command = "memory read" in {
     Arg<"NumberPerLine">, Desc<"The number of items per line to display.">;
   def memory_read_binary : Option<"binary", "b">, Group<2>,
     Desc<"If true, memory will be saved as binary. If false, the memory is "
-    "saved save as an ASCII dump that uses the format, size, count and number "
+    "saved as an ASCII dump that uses the format, size, count and number "
     "per line settings.">;
   def memory_read_type : Option<"type", "t">, Groups<[3,4]>, Arg<"Name">,
     Required, Desc<"The name of a type to view memory as.">;
