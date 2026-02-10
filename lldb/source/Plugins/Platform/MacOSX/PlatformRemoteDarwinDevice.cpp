@@ -263,7 +263,7 @@ Status PlatformRemoteDarwinDevice::GetSharedModule(
   // thing to our local cache.
   error = GetSharedModuleWithLocalCache(module_spec, module_sp,
                                         module_search_paths_ptr, old_modules,
-                                        did_create_ptr);
+                                        did_create_ptr, process);
   if (error.Success())
     return error;
 
