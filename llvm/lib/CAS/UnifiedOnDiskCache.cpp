@@ -157,24 +157,31 @@ UnifiedOnDiskCache::faultInFromUpstreamKV(ArrayRef<uint8_t> Key) {
 }
 
 Error UnifiedOnDiskCache::validateActionCache() {
-  auto ValidateRef = [&](FileOffset Offset, ArrayRef<char> Value) -> Error {
-    assert(Value.size() == sizeof(uint64_t) && "should be validated already");
-    auto ID = ObjectID::fromOpaqueData(support::endian::read64le(Value.data()));
-    auto formatError = [&](Twine Msg) {
-      return createStringError(
-          llvm::errc::illegal_byte_sequence,
-          "bad record at 0x" +
-              utohexstr((unsigned)Offset.get(), /*LowerCase=*/true) + ": " +
-              Msg.str());
+  SmallVector<std::pair<OnDiskKeyValueDB *, OnDiskGraphDB *>> CachePairs;
+  CachePairs.emplace_back(PrimaryKVDB.get(), PrimaryGraphDB.get());
+  if (UpstreamKVDB && UpstreamGraphDB) {
+    CachePairs.emplace_back(UpstreamKVDB.get(), UpstreamGraphDB);
+  }
+
+  for (auto &CachePair : CachePairs) {
+    auto ValidateRef = [&](FileOffset Offset, ArrayRef<char> Value) -> Error {
+      assert(Value.size() == sizeof(uint64_t) && "should be validated already");
+      auto ID = ObjectID::fromOpaqueData(support::endian::read64le(Value.data()));
+      auto formatError = [&](Twine Msg) {
+        return createStringError(
+            llvm::errc::illegal_byte_sequence,
+            "bad record at 0x" +
+                utohexstr((unsigned)Offset.get(), /*LowerCase=*/true) + ": " +
+                Msg.str());
+      };
+      if (Error E = CachePair.second->validateObjectID(ID))
+        return formatError(llvm::toString(std::move(E)));
+      return Error::success();
     };
-    if (Error E = getGraphDB().validateObjectID(ID))
-      return formatError(llvm::toString(std::move(E)));
-    return Error::success();
-  };
-  if (Error E = PrimaryKVDB->validate(ValidateRef))
-    return E;
-  if (UpstreamKVDB)
-    return UpstreamKVDB->validate(ValidateRef);
+
+    if (Error E = CachePair.first->validate(ValidateRef))
+      return E;
+  }
   return Error::success();
 }
 
