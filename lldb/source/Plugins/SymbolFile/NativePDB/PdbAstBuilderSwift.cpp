@@ -1,3 +1,11 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
 #include "PdbAstBuilderSwift.h"
 
 #include "PdbUtil.h"
@@ -74,12 +82,9 @@ CompilerType PdbAstBuilderSwift::GetOrCreateType(PdbTypeSymId type) {
   PdbIndex &index = pdb->GetIndex();
   PdbTypeSymId best_type = GetBestPossibleDecl(type, index.tpi());
 
-  CompilerType ct;
-  if (best_type.index != type.index)
-    ct = GetOrCreateType(best_type);
-  else
-    ct = CreateType(type, index.tpi());
-
+  CompilerType ct = best_type.index == type.index
+                        ? CreateType(type, index.tpi())
+                        : GetOrCreateType(best_type);
   if (ct)
     m_uid_to_type[uid] = ct;
   return ct;
