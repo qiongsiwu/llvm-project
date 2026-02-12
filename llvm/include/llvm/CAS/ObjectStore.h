@@ -249,7 +249,7 @@ public:
     return storeFromOpenFileImpl(FD, Status);
   }
 
-  static Error createUnknownObjectError(const CASID &ID);
+  LLVM_ABI static Error createUnknownObjectError(const CASID &ID);
 
   /// Create ObjectProxy from CASID. If the object doesn't exist, get an error.
   LLVM_ABI Expected<ObjectProxy> getProxy(const CASID &ID);
@@ -258,10 +258,10 @@ public:
   LLVM_ABI Expected<ObjectProxy> getProxy(ObjectRef Ref);
 
   /// \returns \c std::nullopt if the object is missing from the CAS.
-  Expected<std::optional<ObjectProxy>> getProxyIfExists(ObjectRef Ref);
+  LLVM_ABI Expected<std::optional<ObjectProxy>> getProxyIfExists(ObjectRef Ref);
 
   /// Asynchronous version of \c getProxyIfExists.
-  std::future<AsyncProxyValue> getProxyFuture(ObjectRef Ref);
+  LLVM_ABI std::future<AsyncProxyValue> getProxyFuture(ObjectRef Ref);
 
   /// Asynchronous version of \c getProxyIfExists using a callback.
   /// \param[out] CancelObj Optional pointer to receive a cancellation object.
@@ -270,7 +270,7 @@ public:
       unique_function<void(Expected<std::optional<ObjectProxy>>)> Callback,
       std::unique_ptr<Cancellable> *CancelObj = nullptr);
   /// Asynchronous version of \c getProxyIfExists using a callback.
-  void getProxyAsync(
+  LLVM_ABI void getProxyAsync(
       ObjectRef Ref,
       unique_function<void(Expected<std::optional<ObjectProxy>>)> Callback,
       std::unique_ptr<Cancellable> *CancelObj = nullptr);
@@ -360,7 +360,7 @@ public:
     return CAS->forEachRef(H, Callback);
   }
 
-  std::unique_ptr<MemoryBuffer>
+  LLVM_ABI std::unique_ptr<MemoryBuffer>
   getMemoryBuffer(StringRef Name = "",
                   bool RequiresNullTerminator = true) const;
 
@@ -414,11 +414,11 @@ createOnDiskCAS(const Twine &Path);
 
 /// Set \p Path to a reasonable default on-disk path for a persistent CAS for
 /// the current user.
-void getDefaultOnDiskCASPath(SmallVectorImpl<char> &Path);
+LLVM_ABI void getDefaultOnDiskCASPath(SmallVectorImpl<char> &Path);
 
 /// Get a reasonable default on-disk path for a persistent CAS for the current
 /// user.
-std::string getDefaultOnDiskCASPath();
+LLVM_ABI std::string getDefaultOnDiskCASPath();
 
 /// FIXME: Remove.
 void getDefaultOnDiskCASStableID(SmallVectorImpl<char> &Path);
@@ -452,6 +452,7 @@ class ActionCache;
 
 /// Create \c ObjectStore and \c ActionCache instances using the plugin
 /// interface.
+LLVM_ABI
 Expected<std::pair<std::shared_ptr<ObjectStore>, std::shared_ptr<ActionCache>>>
 createPluginCASDatabases(
     StringRef PluginPath, StringRef OnDiskPath,

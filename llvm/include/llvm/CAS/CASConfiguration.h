@@ -55,6 +55,7 @@ public:
   void getResolvedCASPath(llvm::SmallVectorImpl<char> &Result) const;
 
   // Create CASDatabase from the CASConfiguration.
+  LLVM_ABI
   llvm::Expected<std::pair<std::shared_ptr<llvm::cas::ObjectStore>,
                            std::shared_ptr<llvm::cas::ActionCache>>>
   createDatabases() const;
@@ -70,6 +71,7 @@ public:
   ///
   /// Returns the path to configuration file and its corresponding
   /// CASConfiguration.
+  LLVM_ABI
   static std::optional<std::pair<std::string, CASConfiguration>>
   createFromSearchConfigFile(
       StringRef Path,

@@ -510,27 +510,43 @@ public:
   LLVM_ABI bool isInterposable() const;
   LLVM_ABI bool canBenefitFromLocalAlias() const;
 
-  bool hasExternalLinkage() const { return isExternalLinkage(getLinkage()); }
-  bool hasAvailableExternallyLinkage() const {
+  LLVM_ABI bool hasExternalLinkage() const {
+    return isExternalLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasAvailableExternallyLinkage() const {
     return isAvailableExternallyLinkage(getLinkage());
   }
-  bool hasLinkOnceLinkage() const { return isLinkOnceLinkage(getLinkage()); }
-  bool hasLinkOnceAnyLinkage() const {
+  LLVM_ABI bool hasLinkOnceLinkage() const {
+    return isLinkOnceLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasLinkOnceAnyLinkage() const {
     return isLinkOnceAnyLinkage(getLinkage());
   }
-  bool hasLinkOnceODRLinkage() const {
+  LLVM_ABI bool hasLinkOnceODRLinkage() const {
     return isLinkOnceODRLinkage(getLinkage());
   }
-  bool hasWeakLinkage() const { return isWeakLinkage(getLinkage()); }
-  bool hasWeakAnyLinkage() const { return isWeakAnyLinkage(getLinkage()); }
-  bool hasWeakODRLinkage() const { return isWeakODRLinkage(getLinkage()); }
-  bool hasAppendingLinkage() const { return isAppendingLinkage(getLinkage()); }
-  bool hasInternalLinkage() const { return isInternalLinkage(getLinkage()); }
-  bool hasPrivateLinkage() const { return isPrivateLinkage(getLinkage()); }
-  bool hasLocalLinkage() const { return isLocalLinkage(getLinkage()); }
-  bool hasExternalWeakLinkage() const;
-  bool hasCommonLinkage() const { return isCommonLinkage(getLinkage()); }
-  bool hasValidDeclarationLinkage() const {
+  LLVM_ABI bool hasWeakLinkage() const { return isWeakLinkage(getLinkage()); }
+  LLVM_ABI bool hasWeakAnyLinkage() const {
+    return isWeakAnyLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasWeakODRLinkage() const {
+    return isWeakODRLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasAppendingLinkage() const {
+    return isAppendingLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasInternalLinkage() const {
+    return isInternalLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasPrivateLinkage() const {
+    return isPrivateLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasLocalLinkage() const { return isLocalLinkage(getLinkage()); }
+  LLVM_ABI bool hasExternalWeakLinkage() const;
+  LLVM_ABI bool hasCommonLinkage() const {
+    return isCommonLinkage(getLinkage());
+  }
+  LLVM_ABI bool hasValidDeclarationLinkage() const {
     return isValidDeclarationLinkage(getLinkage());
   }
 

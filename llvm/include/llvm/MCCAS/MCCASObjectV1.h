@@ -271,10 +271,10 @@ public:
                             llvm::MCAssembler &Asm,
                             raw_ostream *DebugOS) const override;
 
-  Error serializeObjectFile(cas::ObjectProxy RootNode,
-                            raw_ostream &OS) const override;
+  LLVM_ABI Error serializeObjectFile(cas::ObjectProxy RootNode,
+                                     raw_ostream &OS) const override;
 
-  MCSchema(cas::ObjectStore &CAS);
+  LLVM_ABI MCSchema(cas::ObjectStore &CAS);
 
   Expected<MCObjectProxy> create(ArrayRef<cas::ObjectRef> Refs,
                                  StringRef Data) const {

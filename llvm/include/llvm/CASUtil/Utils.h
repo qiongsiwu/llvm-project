@@ -23,7 +23,7 @@ class CASID;
 Expected<CASID> readCASIDBuffer(cas::ObjectStore &CAS,
                                 llvm::MemoryBufferRef Buffer);
 
-void writeCASIDBuffer(const CASID &ID, llvm::raw_ostream &OS);
+LLVM_ABI void writeCASIDBuffer(const CASID &ID, llvm::raw_ostream &OS);
 
 } // namespace cas
 

@@ -175,7 +175,7 @@ public:
 
   /// Provide a path to a directory where to store the cached files for
   /// incremental build.
-  Error setCacheDir(std::string Path);
+  LLVM_ABI Error setCacheDir(std::string Path);
 
   /// Create a cache entry for the module
   std::unique_ptr<ModuleCacheEntry> createModuleCacheEntry(

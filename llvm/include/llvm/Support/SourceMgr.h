@@ -109,8 +109,8 @@ public:
   explicit SourceMgr(IntrusiveRefCntPtr<vfs::FileSystem> FS);
   SourceMgr(const SourceMgr &) = delete;
   SourceMgr &operator=(const SourceMgr &) = delete;
-  SourceMgr(SourceMgr &&);
-  SourceMgr &operator=(SourceMgr &&);
+  LLVM_ABI SourceMgr(SourceMgr &&);
+  LLVM_ABI SourceMgr &operator=(SourceMgr &&);
   LLVM_ABI ~SourceMgr();
 
   IntrusiveRefCntPtr<vfs::FileSystem> getVirtualFileSystem() const;

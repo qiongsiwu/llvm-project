@@ -27,15 +27,15 @@ class ObjectProxy;
 /// for CAS types.
 class CacheKey {
 public:
-  StringRef getKey() const { return Key; }
+  LLVM_ABI StringRef getKey() const { return Key; }
 
   // TODO: Support CacheKey other than a CASID but rather any array of bytes.
   // To do that, ActionCache need to be able to rehash the key into the index,
   // which then `getOrCompute` method can be used to avoid multiple calls to
   // has function.
   LLVM_ABI CacheKey(const CASID &ID);
-  LLVM_ABI_FOR_TEST CacheKey(const ObjectProxy &Proxy);
-  CacheKey(const ObjectStore &CAS, const ObjectRef &Ref);
+  LLVM_ABI CacheKey(const ObjectProxy &Proxy);
+  LLVM_ABI CacheKey(const ObjectStore &CAS, const ObjectRef &Ref);
 
 private:
   std::string Key;
@@ -146,7 +146,7 @@ LLVM_ABI std::unique_ptr<ActionCache> createInMemoryActionCache();
 
 /// Get a reasonable default on-disk path for a persistent ActionCache for the
 /// current user.
-std::string getDefaultOnDiskActionCachePath();
+LLVM_ABI std::string getDefaultOnDiskActionCachePath();
 
 /// Create an action cache on disk.
 LLVM_ABI Expected<std::unique_ptr<ActionCache>>
