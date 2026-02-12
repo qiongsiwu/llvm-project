@@ -9,6 +9,7 @@
 #ifndef LLVM_LIB_CAS_ONDISKCOMMON_H
 #define LLVM_LIB_CAS_ONDISKCOMMON_H
 
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Error.h"
 #include <chrono>
 #include <optional>
@@ -50,6 +51,29 @@ std::error_code tryLockFileThreadSafe(
 ///
 /// \returns the new size of the file, or an \c Error.
 Expected<size_t> preallocateFileTail(int FD, size_t CurrentSize, size_t NewSize);
+
+/// Helper RAII class for copying a file to a unique file path. At destruction
+/// time it will delete any new temporary files created.
+class UniqueTempFile {
+public:
+  UniqueTempFile() = default;
+  ~UniqueTempFile();
+
+  /// Create a new unique file path under \p ParentPath and copy the contents
+  /// of \p CopyFromPath into it. It will use file cloning when applicable.
+  ///
+  /// \returns the new unique file path.
+  Expected<StringRef> createAndCopyFrom(StringRef ParentPath,
+                                        StringRef CopyFromPath);
+
+  /// Rename the new unique file to \p RenameToPath. This is useful to indicate
+  /// that the unique file doesn't need to be cleared at destruction time.
+  Error renameTo(StringRef RenameToPath);
+
+private:
+  SmallString<256> TmpPath;
+  SmallString<256> UniqueTmpPath;
+};
 
 } // namespace llvm::cas::ondisk
 

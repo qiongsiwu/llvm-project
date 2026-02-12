@@ -30,6 +30,7 @@ add_llvm_unittest(CASTests
   MockGRPCServer.cpp
   ObjectStoreTest.cpp
   OnDiskCASLoggerTest.cpp
+  OnDiskCommonUtils.cpp
   OnDiskGraphDBTest.cpp
   OnDiskHashMappedTrieTest.cpp
   OnDiskKeyValueDBTest.cpp

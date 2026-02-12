@@ -10,12 +10,15 @@
 #include "BuiltinCAS.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FunctionExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/CAS/UnifiedOnDiskCache.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
 #include <deque>
 
@@ -192,6 +195,43 @@ ObjectStore::storeFromOpenFileImpl(sys::fs::file_t FD,
   if (Error E = sys::fs::readNativeFileToEOF(FD, Data, ChunkSize))
     return std::move(E);
   return store({}, ArrayRef(Data.data(), Data.size()));
+}
+
+Expected<ObjectRef> ObjectStore::storeFromFile(StringRef Path) {
+  sys::fs::file_t FD;
+  if (Error E = sys::fs::openNativeFileForRead(Path).moveInto(FD))
+    return E;
+  auto CloseFile = scope_exit([&FD] { sys::fs::closeFile(FD); });
+  return storeFromOpenFile(FD);
+}
+
+Error ObjectStore::exportDataToFile(ObjectHandle Node, StringRef Path) const {
+  SmallString<256> TmpPath;
+  SmallString<256> Model;
+  Model += sys::path::parent_path(Path);
+  sys::path::append(Model, "%%%%%%%.tmp");
+  if (std::error_code EC = sys::fs::createUniqueFile(Model, TmpPath))
+    return createFileError(Model, EC);
+  auto RemoveTmpFile = scope_exit([&] {
+    if (!TmpPath.empty())
+      sys::fs::remove(TmpPath);
+  });
+
+  ArrayRef<char> Data = getData(Node);
+  std::error_code EC;
+  raw_fd_ostream FS(TmpPath, EC);
+  if (EC)
+    return createFileError(TmpPath, EC);
+  FS.write(Data.begin(), Data.size());
+  FS.close();
+  if (FS.has_error())
+    return createFileError(TmpPath, FS.error());
+
+  if (std::error_code EC = sys::fs::rename(TmpPath, Path))
+    return createFileError(Path, EC);
+  TmpPath.clear();
+
+  return Error::success();
 }
 
 Error ObjectStore::validateTree(ObjectRef Root) {
