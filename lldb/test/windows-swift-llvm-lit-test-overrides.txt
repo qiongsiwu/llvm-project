@@ -98,11 +98,6 @@ xfail lldb-api :: python_api/address_range/TestAddressRange.py
 # https://github.com/swiftlang/llvm-project/issues/9643
 xfail lldb-shell :: Commands/command-process-launch-user-entry.test
 
-# Pre-emptively skipping since it won't pass until the following
-# is fixed:
-# https://github.com/swiftlang/llvm-project/issues/12289
-skip lldb-shell :: SymbolFile/NativePDB/swift-frame-var.test
-
 # Skip SymbolTests because we cannot xfail unittests by name. We would need to
 # specify their indexes, but these are subject to change. Right now, failures
 # are:
