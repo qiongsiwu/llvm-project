@@ -127,6 +127,7 @@ struct DAP {
   bool configuration_done;
 
   bool waiting_for_run_in_terminal = false;
+  std::mutex call_mutex;
   ProgressEventReporter progress_event_reporter;
 
   /// Keep track of the last stop thread index IDs as threads won't go away
@@ -134,7 +135,6 @@ struct DAP {
   llvm::DenseSet<lldb::tid_t> thread_ids;
 
   uint32_t reverse_request_seq = 0;
-  std::mutex call_mutex;
   llvm::SmallDenseMap<int64_t, std::unique_ptr<ResponseHandler>>
       inflight_reverse_requests;
   ReplMode repl_mode;
