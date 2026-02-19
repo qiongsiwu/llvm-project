@@ -10,5 +10,5 @@ include Makefile.rules
 .PHONY: secret.h
 
 secret.h:
-	mkdir -p $(BUILDDIR)/secret
-	echo "struct S { int i; };" > $(BUILDDIR)/secret/secret.h
+	$(call MKDIR_P,$(BUILDDIR)/secret)
+	$(call ECHO_TO_FILE,'struct S { int i; };',$(BUILDDIR)/secret/secret.h)
