@@ -438,7 +438,9 @@ public:
 
   /// Attempts to convert a Clang type into a Swift type.
   /// For example, int is converted to Int32.
-  CompilerType ConvertClangTypeToSwiftType(CompilerType clang_type) override;
+  CompilerType
+  ConvertClangTypeToSwiftType(CompilerType clang_type,
+                              swift::Mangle::ManglingFlavor flavor) override;
 
   bool TypeHasArchetype(CompilerType type);
 
@@ -488,8 +490,8 @@ public:
 
   swift::ClangImporter *GetClangImporter();
 
-  CompilerType
-  CreateTupleType(const std::vector<TupleElement> &elements) override;
+  CompilerType CreateTupleType(const std::vector<TupleElement> &elements,
+                               swift::Mangle::ManglingFlavor flavor) override;
   bool IsTupleType(lldb::opaque_compiler_type_t type) override;
   std::optional<NonTriviallyManagedReferenceKind>
   GetNonTriviallyManagedReferenceKind(
@@ -500,7 +502,7 @@ public:
   CreateGenericTypeParamType(unsigned int depth, unsigned int index,
                              swift::Mangle::ManglingFlavor flavor) override;
 
-  CompilerType GetErrorType() override;
+  CompilerType GetErrorType(swift::Mangle::ManglingFlavor flavor) override;
 
   /// Error handling
   /// \{
