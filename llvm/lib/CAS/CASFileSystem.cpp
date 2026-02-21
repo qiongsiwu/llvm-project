@@ -96,6 +96,9 @@ public:
     return WorkingDirectory.Path;
   }
 
+  void printImpl(raw_ostream &OS, PrintType Type,
+                 unsigned IndentLevel) const final;
+
   Error initialize(ObjectRef Root);
 
   CASFileSystem(std::shared_ptr<ObjectStore> DB, sys::path::Style PathStyle)
@@ -122,7 +125,9 @@ private:
 
 class CASFileSystem::VFSFile final : public CASBackedFile {
 public:
-  ErrorOr<vfs::Status> status() final { return Entry->getStatus(Name); }
+  ErrorOr<vfs::Status> status() final {
+    return Entry->getStatus(Name, /*FollowSymlinks=*/true);
+  }
 
   ErrorOr<std::string> getName() final { return Name; }
 
@@ -182,6 +187,45 @@ std::error_code CASFileSystem::setCurrentWorkingDirectory(const Twine &Path) {
   WorkingDirectory.Path = CanonicalPath.str();
   WorkingDirectory.Entry = *ExpectedEntry;
   return std::error_code();
+}
+
+void CASFileSystem::printImpl(raw_ostream &OS, PrintType Type,
+                              unsigned IndentLevel) const {
+  printIndent(OS, IndentLevel);
+  OS << "CASFileSystem\n";
+  if (Type == PrintType::Summary)
+    return;
+
+  IndentLevel += 1;
+  printIndent(OS, IndentLevel);
+  StringRef path_separator = get_separator(PathStyle);
+  auto &Root = Cache->getRoot(path_separator);
+  OS << "root: " << Root.getTreePath();
+  assert(Root.getRef() && "missing ID for primary CASFileSystem root");
+  if (Root.getRef())
+    OS << ' ' << DB.getID(*Root.getRef()) << '\n';
+
+  if (Type == PrintType::Contents)
+    return;
+
+  IndentLevel += 1;
+  TreeSchema Schema(DB);
+  auto TreeN = DB.getProxy(*Root.getRef());
+  if (!TreeN) {
+    OS << toString(TreeN.takeError()) << '\n';
+    return;
+  }
+  Error E = Schema.walkFileTreeRecursively(
+      DB, TreeN->getRef(),
+      [&](const NamedTreeEntry &Entry, std::optional<TreeProxy> Tree) -> Error {
+        if (Entry.getKind() != TreeEntry::Tree) {
+          printIndent(OS, IndentLevel);
+          Entry.print(OS, DB);
+        }
+        return Error::success();
+      });
+  if (E)
+    OS << toString(std::move(E)) << '\n';
 }
 
 Error CASFileSystem::loadDirectory(DirectoryEntry &Parent) {
@@ -279,7 +323,7 @@ ErrorOr<vfs::Status> CASFileSystem::status(const Twine &Path) {
       return errorToErrorCode(std::move(E));
   }
 
-  return Entry->getStatus(PathRef);
+  return Entry->getStatus(PathRef, /*FollowSymlinks=*/true);
 }
 
 Expected<const vfs::CachedDirectoryEntry *>
