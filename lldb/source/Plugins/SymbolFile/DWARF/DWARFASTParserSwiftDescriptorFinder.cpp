@@ -22,6 +22,7 @@
 
 #include "Plugins/TypeSystem/Swift/TypeSystemSwiftTypeRef.h"
 #include "swift/Demangling/ManglingFlavor.h"
+#include "swift/RemoteInspection/DescriptorFinder.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 
 #include "lldb/Utility/LLDBLog.h"
@@ -235,9 +236,11 @@ public:
   DWARFBuiltinTypeDescriptorImpl(uint32_t size, uint32_t alignment,
                                  uint32_t stride,
                                  uint32_t num_extra_inhabitants,
-                                 bool is_bitwise_takable, ConstString type_name)
+                                 swift::reflection::BitwiseBorrowability borrowability,
+                                 bool addr_for_dependencies, ConstString type_name)
       : swift::reflection::BuiltinTypeDescriptorBase(
-            size, alignment, stride, num_extra_inhabitants, is_bitwise_takable),
+            size, alignment, stride, num_extra_inhabitants, borrowability,
+            addr_for_dependencies),
         m_type_name(ExtractTypeName(type_name.GetStringRef())) {}
   ~DWARFBuiltinTypeDescriptorImpl() override = default;
 
@@ -254,10 +257,12 @@ public:
   HardcodedBuiltinTypeDescriptorImpl(uint32_t size, uint32_t alignment,
                                      uint32_t stride,
                                      uint32_t num_extra_inhabitants,
-                                     bool is_bitwise_takable,
+                                     swift::reflection::BitwiseBorrowability borrowability,
+                                     bool addr_for_dependencies,
                                      std::string type_name)
       : swift::reflection::BuiltinTypeDescriptorBase(
-            size, alignment, stride, num_extra_inhabitants, is_bitwise_takable),
+            size, alignment, stride, num_extra_inhabitants, borrowability,
+            addr_for_dependencies),
         m_type_name(std::move(type_name)) {}
   ~HardcodedBuiltinTypeDescriptorImpl() override = default;
 
@@ -283,7 +288,9 @@ getHardcodedBuiltinTypeDescriptor(const swift::reflection::TypeRef *TR,
             /*alignment=*/pointer_size,
             /*stride=*/pointer_size,
             /*num_extra_inhabitants=*/num_extra_inhabitants,
-            /*is_bitwise_takable=*/true, std::move(name));
+            /*borrowability=*/swift::reflection::BitwiseBorrowability::TakableAndBorrowable,
+            /*addr_for_dependencies=*/false,
+            std::move(name));
       };
 
   // Builtin.NativeObject (Bo).
@@ -312,7 +319,9 @@ getHardcodedBuiltinTypeDescriptor(const swift::reflection::TypeRef *TR,
         /*alignment=*/pointer_size,
         /*stride=*/size,
         /*num_extra_inhabitants=*/0,
-        /*is_bitwise_takable=*/true, "BB");
+        /*borrowability=*/swift::reflection::BitwiseBorrowability::TakableAndBorrowable,
+        /*addr_for_dependencies=*/true,
+        "BB");
   }
 
   // Thin function type () -> ().
@@ -557,10 +566,13 @@ getDWARFBuiltinTypeDescriptor(TypeSystemSwiftTypeRef &swift_typesystem,
   auto num_extra_inhabitants = die.GetAttributeValueAsUnsigned(
       llvm::dwarf::DW_AT_LLVM_num_extra_inhabitants, 0);
 
-  auto is_bitwise_takable = true; // TODO: encode it in DWARF
+  // TODO: encode these in DWARF
+  auto borrowability = swift::reflection::BitwiseBorrowability::TakableAndBorrowable;
+  auto addressable_for_dependencies = false;
 
   return std::make_unique<DWARFBuiltinTypeDescriptorImpl>(
-      byte_size, alignment, stride, num_extra_inhabitants, is_bitwise_takable,
+      byte_size, alignment, stride, num_extra_inhabitants,
+      borrowability, addressable_for_dependencies,
       type.GetMangledTypeName());
 }
 

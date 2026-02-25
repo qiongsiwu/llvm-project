@@ -42,6 +42,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingFlavor.h"
+#include "swift/RemoteInspection/DescriptorFinder.h"
 #include "swift/RemoteInspection/ReflectionContext.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Strings.h"
@@ -475,14 +476,18 @@ const swift::reflection::TypeInfo *SwiftLanguageRuntime::emplaceClangTypeInfo(
     auto it_b = m_clang_type_info.insert(
         {clang_type.GetOpaqueQualType(),
          swift::reflection::TypeInfo(swift::reflection::TypeInfoKind::Builtin,
-                                     *byte_size, byte_align, byte_stride,
-                                     extra_inhabitants, true)});
+                 *byte_size, byte_align, byte_stride,
+                 extra_inhabitants,
+                 swift::reflection::BitwiseBorrowability::TakableAndBorrowable,
+                 /*AFD=*/ false)});
     return &*it_b.first->second;
   }
   auto it_b = m_clang_record_type_info.insert(
       {clang_type.GetOpaqueQualType(),
        swift::reflection::RecordTypeInfo(
-           *byte_size, byte_align, byte_stride, extra_inhabitants, false,
+           *byte_size, byte_align, byte_stride, extra_inhabitants,
+           swift::reflection::BitwiseBorrowability::None,
+           /*AFD=*/true,
            swift::reflection::RecordKind::Struct, fields)});
   return &*it_b.first->second;
 }
