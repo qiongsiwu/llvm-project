@@ -18,6 +18,8 @@
 #include "llvm/DebugInfo/CodeView/TypeDeserializer.h"
 #include "llvm/DebugInfo/PDB/Native/TpiStream.h"
 
+#include "swift/Demangling/Demangle.h"
+
 using namespace lldb_private;
 using namespace lldb_private::npdb;
 using namespace llvm::codeview;
@@ -33,7 +35,7 @@ CompilerType PdbAstBuilderSwift::CreateType(PdbTypeSymId type,
 
   CVType cvt = tpi.getType(type.index);
 
-  llvm::StringRef mangled_name;
+  llvm::StringRef decorated;
   switch (cvt.kind()) {
   case LF_STRUCTURE:
   case LF_CLASS: {
@@ -41,7 +43,7 @@ CompilerType PdbAstBuilderSwift::CreateType(PdbTypeSymId type,
     llvm::cantFail(TypeDeserializer::deserializeAs<ClassRecord>(cvt, cr));
     if (!cr.hasUniqueName())
       return {};
-    mangled_name = cr.UniqueName;
+    decorated = cr.UniqueName;
     break;
   }
   case LF_ENUM: {
@@ -49,7 +51,7 @@ CompilerType PdbAstBuilderSwift::CreateType(PdbTypeSymId type,
     llvm::cantFail(TypeDeserializer::deserializeAs<EnumRecord>(cvt, er));
     if (!er.hasUniqueName())
       return {};
-    mangled_name = er.UniqueName;
+    decorated = er.UniqueName;
     break;
   }
   case LF_MODIFIER: {
@@ -62,10 +64,10 @@ CompilerType PdbAstBuilderSwift::CreateType(PdbTypeSymId type,
     return {};
   }
 
-  if (!mangled_name.starts_with("$s"))
+  if (!swift::Demangle::isSwiftSymbol(decorated))
     return {};
 
-  return m_swift_ts.GetTypeFromMangledTypename(ConstString(mangled_name));
+  return m_swift_ts.GetTypeFromMangledTypename(ConstString(decorated));
 }
 
 CompilerType PdbAstBuilderSwift::GetOrCreateType(PdbTypeSymId type) {
@@ -73,8 +75,7 @@ CompilerType PdbAstBuilderSwift::GetOrCreateType(PdbTypeSymId type) {
     return {};
 
   lldb::user_id_t uid = toOpaqueUid(type);
-  auto iter = m_uid_to_type.find(uid);
-  if (iter != m_uid_to_type.end())
+  if (auto iter = m_uid_to_type.find(uid); iter != m_uid_to_type.end())
     return iter->second;
 
   auto *pdb = llvm::cast<SymbolFileNativePDB>(
