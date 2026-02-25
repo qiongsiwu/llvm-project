@@ -16,6 +16,7 @@
 #include "lldb/Utility/LLDBAssert.h"
 
 #include "llvm/DebugInfo/CodeView/TypeDeserializer.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/DebugInfo/PDB/Native/TpiStream.h"
 
 #include "swift/Demangling/Demangle.h"
@@ -78,8 +79,10 @@ CompilerType PdbAstBuilderSwift::GetOrCreateType(PdbTypeSymId type) {
   if (auto iter = m_uid_to_type.find(uid); iter != m_uid_to_type.end())
     return iter->second;
 
-  auto *pdb = llvm::cast<SymbolFileNativePDB>(
+  auto *pdb = llvm::dyn_cast<SymbolFileNativePDB>(
       m_swift_ts.GetSymbolFile()->GetBackingSymbolFile());
+  if (!pdb)
+    llvm::report_fatal_error("PdbAstBuilderSwift called from outside NativePDB context.");
   PdbIndex &index = pdb->GetIndex();
   PdbTypeSymId best_type = GetBestPossibleDecl(type, index.tpi());
 

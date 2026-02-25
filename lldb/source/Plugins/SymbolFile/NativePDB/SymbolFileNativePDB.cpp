@@ -287,7 +287,7 @@ GetNestedTagDefinition(const NestedTypeRecord &Record,
 
 // BEGIN SWIFT
 // Uses a heuristic based on the mangled name to identify
-// Swift types. Needed since types are commingled in the type stream. 
+// Swift types. Needed since types are commingled in the type stream.
 static bool IsSwiftType(PdbTypeSymId type_id, PdbIndex& index) {
   TypeIndex ti = type_id.index;
   if (ti.isSimple())
@@ -300,7 +300,7 @@ static bool IsSwiftType(PdbTypeSymId type_id, PdbIndex& index) {
         TypeDeserializer::deserializeAs<ModifierRecord>(cvt, mfr));
     return IsSwiftType(PdbTypeSymId(mfr.ModifiedType, false), index);
   }
-  if (cvt.kind() != LF_STRUCTURE && cvt.kind() != LF_CLASS)
+  if (!llvm::is_contained({LF_STRUCTURE, LF_CLASS}, cvt.kind()))
     return false;
   ClassRecord cr;
   llvm::cantFail(TypeDeserializer::deserializeAs<ClassRecord>(cvt, cr));
