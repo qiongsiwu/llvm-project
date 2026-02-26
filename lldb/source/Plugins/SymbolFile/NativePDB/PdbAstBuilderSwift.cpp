@@ -14,10 +14,12 @@
 #include "Plugins/TypeSystem/Swift/TypeSystemSwiftTypeRef.h"
 #include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Utility/LLDBAssert.h"
+#include "lldb/Utility/LLDBLog.h"
+#include "lldb/Utility/Log.h"
 
 #include "llvm/DebugInfo/CodeView/TypeDeserializer.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/DebugInfo/PDB/Native/TpiStream.h"
+#include "llvm/Support/ErrorHandling.h"
 
 #include "swift/Demangling/Demangle.h"
 
@@ -41,7 +43,11 @@ CompilerType PdbAstBuilderSwift::CreateType(PdbTypeSymId type,
   case LF_STRUCTURE:
   case LF_CLASS: {
     ClassRecord cr;
-    llvm::cantFail(TypeDeserializer::deserializeAs<ClassRecord>(cvt, cr));
+    if (auto err = TypeDeserializer::deserializeAs<ClassRecord>(cvt, cr)) {
+      LLDB_LOG_ERROR(GetLog(LLDBLog::Symbols), std::move(err),
+                     "Failed to deserialize ClassRecord: {0}");
+      return {};
+    }
     if (!cr.hasUniqueName())
       return {};
     decorated = cr.UniqueName;
@@ -49,7 +55,11 @@ CompilerType PdbAstBuilderSwift::CreateType(PdbTypeSymId type,
   }
   case LF_ENUM: {
     EnumRecord er;
-    llvm::cantFail(TypeDeserializer::deserializeAs<EnumRecord>(cvt, er));
+    if (auto err = TypeDeserializer::deserializeAs<EnumRecord>(cvt, er)) {
+      LLDB_LOG_ERROR(GetLog(LLDBLog::Symbols), std::move(err),
+                     "Failed to deserialize EnumRecord: {0}");
+      return {};
+    }
     if (!er.hasUniqueName())
       return {};
     decorated = er.UniqueName;
@@ -57,8 +67,11 @@ CompilerType PdbAstBuilderSwift::CreateType(PdbTypeSymId type,
   }
   case LF_MODIFIER: {
     ModifierRecord mfr;
-    llvm::cantFail(
-        TypeDeserializer::deserializeAs<ModifierRecord>(cvt, mfr));
+    if (auto err = TypeDeserializer::deserializeAs<ModifierRecord>(cvt, mfr)) {
+      LLDB_LOG_ERROR(GetLog(LLDBLog::Symbols), std::move(err),
+                     "Failed to deserialize ModifierRecord: {0}");
+      return {};
+    }
     return GetOrCreateType(PdbTypeSymId(mfr.ModifiedType, false));
   }
   default:
