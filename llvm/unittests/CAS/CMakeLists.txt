@@ -21,6 +21,7 @@ add_llvm_unittest(CASTests
   BuiltinUnifiedCASDatabasesTest.cpp
   CASConfigurationTest.cpp
   CASFileSystemTest.cpp
+  CASFSBuilderTest.cpp
   CASTestConfig.cpp
   CASOutputBackendTest.cpp
   CASProvidingFileSystemTest.cpp
