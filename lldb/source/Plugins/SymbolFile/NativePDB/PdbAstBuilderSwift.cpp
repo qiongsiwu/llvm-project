@@ -94,8 +94,10 @@ CompilerType PdbAstBuilderSwift::GetOrCreateType(PdbTypeSymId type) {
 
   auto *pdb = llvm::dyn_cast<SymbolFileNativePDB>(
       m_swift_ts.GetSymbolFile()->GetBackingSymbolFile());
-  if (!pdb)
-    llvm::report_fatal_error("PdbAstBuilderSwift called from outside NativePDB context.");
+  if (!pdb) {
+    lldbassert(false && "PdbAstBuilderSwift called from outside NativePDB context.");
+    return {};
+  }
   PdbIndex &index = pdb->GetIndex();
   PdbTypeSymId best_type = GetBestPossibleDecl(type, index.tpi());
 
