@@ -1814,20 +1814,24 @@ class LLDBTestCaseFactory(type):
                 attrvalue, "__no_debug_info_test__", False
             ):
                 # If any debug info categories were explicitly tagged, assume that list to be
-                # authoritative.  If none were specified, try with all debug
-                # info formats.
+                # authoritative.  If none were specified, try with all debug info formats.
+                test_method_categories = set(getattr(attrvalue, "categories", []))
                 all_dbginfo_categories = set(
                     test_categories.debug_info_categories.keys()
                 )
-                categories = (
-                    set(getattr(attrvalue, "categories", [])) & all_dbginfo_categories
-                )
-                if not categories:
-                    categories = [
+                dbginfo_categories = test_method_categories & all_dbginfo_categories
+                other_categories = list(test_method_categories - all_dbginfo_categories)
+                if not dbginfo_categories:
+                    dbginfo_categories = [
                         category
                         for category, can_replicate in test_categories.debug_info_categories.items()
                         if can_replicate
                     ]
+
+                    # PDB is off by default, because it has a lot of failures right now.
+                    # See llvm.org/pr149498
+                    if original_testcase.TEST_WITH_PDB_DEBUG_INFO:
+                        dbginfo_categories.append("pdb")
 
                 xfail_for_debug_info_cat_fn = getattr(
                     attrvalue, "__xfail_for_debug_info_cat_fn__", no_reason
@@ -1835,9 +1839,8 @@ class LLDBTestCaseFactory(type):
                 skip_for_debug_info_cat_fn = getattr(
                     attrvalue, "__skip_for_debug_info_cat_fn__", no_reason
                 )
-                for cat in categories:
+                for cat in dbginfo_categories:
 
-                    @decorators.add_test_categories([cat])
                     @wraps(attrvalue)
                     def test_method(self, attrvalue=attrvalue):
                         return attrvalue(self)
@@ -1845,6 +1848,7 @@ class LLDBTestCaseFactory(type):
                     method_name = attrname + "_" + cat
                     test_method.__name__ = method_name
                     test_method.debug_info = cat
+                    test_method.categories = other_categories + [cat]
 
                     xfail_reason = xfail_for_debug_info_cat_fn(cat)
                     if xfail_reason:
@@ -1915,6 +1919,13 @@ class TestBase(Base, metaclass=LLDBTestCaseFactory):
     # Subclasses can set this to true (if they don't depend on debug info) to avoid running the
     # test multiple times with various debug info types.
     NO_DEBUG_INFO_TESTCASE = False
+
+    TEST_WITH_PDB_DEBUG_INFO = False
+    """
+    Subclasses can set this to True to test with PDB in addition to the other debug info
+    types. This id off by default because many tests will fail due to missing functionality in PDB.
+    See llvm.org/pr149498.
+    """
 
     def generateSource(self, source):
         template = source + ".template"
