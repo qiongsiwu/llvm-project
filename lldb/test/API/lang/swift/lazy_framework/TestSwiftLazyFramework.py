@@ -12,6 +12,7 @@ class TestSwiftLazyFramework(lldbtest.TestBase):
 
     @swiftTest
     @skipIf(oslist=no_match(["macosx"]))
+    @skipIf(bugnumber="rdar://171278439") # randomly fails to dlopen in CI
     def test(self):
         """Test that a framework that is registered as autolinked in a Swift
            module used in the target, but not linked against the target is
