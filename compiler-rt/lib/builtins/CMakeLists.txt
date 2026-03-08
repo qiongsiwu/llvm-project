@@ -335,17 +335,18 @@ if (NOT MSVC)
     )
   endif()
 
-  if (NOT ANDROID)
+  if(NOT ANDROID AND (NOT WIN32 OR MINGW))
     set(x86_64_SOURCES
       ${x86_64_SOURCES}
       ${x86_80_BIT_SOURCES}
-      x86_64/floatdixf.c
-    )
-    if (NOT WIN32)
+      x86_64/floatdixf.c)
+
+    # TODO(compnerd) floatundixf.S currently implements the SysV calling
+    # convention, this must be ported to the Windows ABI.
+    if(NOT WIN32)
       set(x86_64_SOURCES
         ${x86_64_SOURCES}
-        x86_64/floatundixf.S
-      )
+        x86_64/floatundixf.S)
     endif()
   endif()
 
@@ -379,7 +380,6 @@ if (NOT MSVC)
   if (NOT ANDROID)
     set(i386_SOURCES
       ${i386_SOURCES}
-      ${x86_80_BIT_SOURCES}
       i386/floatdixf.S
       i386/floatundixf.S
     )
@@ -390,6 +390,12 @@ if (NOT MSVC)
       ${i386_SOURCES}
       i386/chkstk.S
     )
+  endif()
+
+  if(NOT ANDROID AND NOT (WIN32 AND NOT MINGW))
+    set(i386_SOURCES
+      ${i386_SOURCES}
+      ${x86_80_BIT_SOURCES})
   endif()
 else () # MSVC
   # Use C versions of functions when building on MSVC
