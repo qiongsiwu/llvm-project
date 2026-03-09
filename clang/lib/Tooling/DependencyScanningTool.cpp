@@ -278,27 +278,12 @@ initVFSForTUBufferScanning(IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
   return std::make_pair(OverlayFS, ModifiedCommandLine);
 }
 
-namespace {
-struct FakeInputBuffer {
-  // A null terminated buffer generated at compile time.
-  // Using this buffer we can avoid initializing a std::string on the
-  // heap, which triggers the AddressSanitizer.
-  char Data[CompilerInstanceWithContext::MaxNumOfQueries + 1];
-  constexpr FakeInputBuffer() : Data{} {
-    for (int I = 0; I < CompilerInstanceWithContext::MaxNumOfQueries; ++I)
-      Data[I] = ' ';
-    Data[CompilerInstanceWithContext::MaxNumOfQueries] = '\0';
-  }
-};
-constexpr FakeInputBuffer FakeInputBuf;
-} // namespace
-
 // The fake input buffer is read-only, and it is used to produce
 // unique source locations for the diagnostics. Therefore sharing
 // this global buffer across threads is ok.
-static const StringRef FakeInput(FakeInputBuf.Data,
-                                 CompilerInstanceWithContext::MaxNumOfQueries +
-                                     1);
+static const std::string
+    FakeInput(clang::tooling::CompilerInstanceWithContext::MaxNumOfQueries,
+              ' ');
 
 static std::pair<IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>,
                  std::vector<std::string>>
