@@ -138,8 +138,12 @@ ObjectFileSP ObjectFile::FindPlugin(const lldb::ModuleSP &module_sp,
          (callback = PluginManager::GetObjectFileCreateCallbackAtIndex(idx)) !=
          nullptr;
          ++idx) {
-      ObjectFileSP object_file_sp(callback(module_sp, extractor_sp, data_offset,
-                                           file, file_offset, file_size));
+      // Make a copy of the extractor in case any plugin modifies it while
+      // processing.
+      DataExtractorSP extractor_copy_sp = extractor_sp->Clone();
+      ObjectFileSP object_file_sp(callback(module_sp, extractor_copy_sp,
+                                           data_offset, file, file_offset,
+                                           file_size));
       if (object_file_sp.get())
         return object_file_sp;
     }
