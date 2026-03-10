@@ -674,6 +674,9 @@ public:
                        // the process to exit
       std::string
           *command_output, // Pass nullptr if you don't want the command output
+      std::string
+          *separated_error_output, // Pass nullptr to have error and command
+                                   // output combined in command_output.
       const Timeout<std::micro> &timeout);
 
   virtual lldb_private::Status RunShellCommand(
@@ -685,6 +688,9 @@ public:
                        // the process to exit
       std::string
           *command_output, // Pass nullptr if you don't want the command output
+      std::string
+          *separated_error_output, // Pass nullptr to have error and command
+                                   // output combined in command_output.
       const Timeout<std::micro> &timeout);
 
   virtual void SetLocalCacheDirectory(const char *local);
