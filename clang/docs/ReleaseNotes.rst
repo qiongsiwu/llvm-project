@@ -518,6 +518,12 @@ related warnings within the method body.
 - Clang will print the "reason" string argument passed on to
   ``[[clang::warn_unused_result("reason")]]`` as part of the warning diagnostic.
 
+- Introduced a new function attribute ``__attribute__((__personality__(...)))``
+  to explicitly specify the personality routine for exception handling. THis is
+  meant to be a low level tool for language runtime authors to associate a
+  foreign language personality with a given function. Note that this does not
+  perform any ABI validation for the personality routine.
+
 Improvements to Clang's diagnostics
 -----------------------------------
 - Added ``-Wlifetime-safety`` to enable lifetime safety analysis,
