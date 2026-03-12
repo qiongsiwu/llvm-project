@@ -5383,3 +5383,10 @@ def NonString : InheritableAttr {
   let Subjects = SubjectList<[Var, Field]>;
   let Documentation = [NonStringDocs];
 }
+
+def Personality : InheritableAttr {
+  let Spellings = [Clang<"personality">];
+  let Args = [DeclArgument<Function, "Routine">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [PersonalityDocs];
+}
