@@ -746,8 +746,13 @@ int main(int argc, char const *argv[]) {
 #endif
 
 #ifdef _WIN32
-  if (llvm::Error error = SetupPythonRuntimeLibrary())
+  if (llvm::Error error = SetupPythonRuntimeLibrary()) {
     llvm::WithColor::error() << llvm::toString(std::move(error)) << '\n';
+    // BEGIN SWIFT
+    llvm::WithColor::note() << g_python_installation_note;
+    return 1;
+    // END SWIFT
+  }
 #endif
 
   // Parse arguments.

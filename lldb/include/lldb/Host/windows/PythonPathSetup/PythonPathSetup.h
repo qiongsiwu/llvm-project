@@ -44,4 +44,8 @@ bool AddPythonDLLToSearchPath();
 ///   again if python3xx.dll can be loaded.
 llvm::Error SetupPythonRuntimeLibrary();
 
+// BEGIN SWIFT
+extern const std::string g_python_installation_note;
+// END SWIFT
+
 #endif // LLDB_SOURCE_HOST_PYTHONPATHSETUP_H
