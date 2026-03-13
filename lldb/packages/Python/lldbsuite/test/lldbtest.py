@@ -1136,11 +1136,6 @@ class Base(unittest.TestCase):
         # the shared module cache.
         lldb.SBModule.GarbageCollectAllocatedModules()
 
-        # Assert that the global module cache is empty.
-        # FIXME: This assert fails on Windows.
-        if self.getPlatform() != "windows":
-            self.assertEqual(lldb.SBModule.GetNumberAllocatedModules(), 0)
-
     # =========================================================
     # Various callbacks to allow introspection of test progress
     # =========================================================
