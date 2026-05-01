@@ -1069,6 +1069,11 @@ static bool ParseGlobal(const swift::Demangle::NodePointer &node,
   for (swift::Demangle::Node::iterator pos = node->begin(); pos != end; ++pos) {
     swift::Demangle::NodePointer child = *pos;
     if (child) {
+      // Peel off static node.
+      if (child->getKind() == swift::Demangle::Node::Kind::Static &&
+          child->hasChildren())
+        child = child->getFirstChild();
+
       kind = child->getKind();
       switch (child->getKind()) {
       case swift::Demangle::Node::Kind::Allocator:
