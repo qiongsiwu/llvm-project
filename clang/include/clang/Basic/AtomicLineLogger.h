@@ -16,6 +16,7 @@
 #define LLVM_CLANG_BASIC_ATOMICLINELOGGER_H
 
 #include "clang/Basic/LLVM.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <memory>
 
