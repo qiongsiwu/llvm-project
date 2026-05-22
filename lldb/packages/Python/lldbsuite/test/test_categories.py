@@ -21,8 +21,8 @@ debug_info_categories = {
 }
 
 swift_module_importer_categories = {
-    "clangimporter": True,
-    "dwarfimporter": True,
+    "clang": True,
+    "noclang": True,
 }
 
 embedded_swift_categories = {
@@ -59,8 +59,8 @@ all_categories = {
     "stresstest": "Tests related to stressing lldb limits",
     "swiftmaccatalyst": "Tests which require swift maccatalyst stdlib support",
     "watchpoint": "Watchpoint-related tests",
-    "clangimporter": "Tests run with the Swift ClangImporter",
-    "dwarfimporter": "Tests run with the Swift DWARFImporter",
+    "clang": "Tests run with the Swift ClangImporter+DWARFImporter",
+    "noclang": "Tests run with the Swift DWARFImporter",
     "swift_embedded": "Tests are compiled as embedded Swift",
     "swift": "Tests are compiled as normal Swift",
 }

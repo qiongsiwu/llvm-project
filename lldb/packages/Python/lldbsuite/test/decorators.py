@@ -272,17 +272,17 @@ def _decorateTest(
         key, val = setting[0], setting[1]
         if key == "symbols.use-swift-clangimporter":
             if _is_setting_disabled(val):
-                swift_module_importer = ["dwarfimporter"]
+                swift_module_importer = ["noclang"]
                 setting = None
             elif _is_setting_enabled(val):
-                swift_module_importer = ["clangimporter"]
+                swift_module_importer = ["clang"]
                 setting = None
         elif key == "symbols.use-swift-dwarfimporter":
             if _is_setting_disabled(val):
-                swift_module_importer = ["clangimporter"]
+                swift_module_importer = ["clang"]
                 setting = None
             elif _is_setting_enabled(val):
-                swift_module_importer = ["dwarfimporter"]
+                swift_module_importer = ["noclang"]
                 setting = None
 
     def fn(**actual_variants):
