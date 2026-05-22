@@ -32,3 +32,9 @@ if(LLDB_BUILD_FRAMEWORK)
       "@loader_path/../../Library/PrivateFrameworks"
   )
 endif()
+
+# BEGIN Swift Mods
+if(SWIFT_BUILD_SWIFT_SYNTAX)
+  add_properties_for_swift_modules(lldb-mcp "../")
+endif()
+# END Swift Mods
