@@ -27,7 +27,7 @@ swift_module_importer_categories = {
 
 embedded_swift_categories = {
     "swift": True,
-    "swift_embedded": True,
+    "swiftembed": True,
 }
 
 all_categories = {
@@ -61,7 +61,7 @@ all_categories = {
     "watchpoint": "Watchpoint-related tests",
     "clang": "Tests run with the Swift ClangImporter+DWARFImporter",
     "noclang": "Tests run with the Swift DWARFImporter",
-    "swift_embedded": "Tests are compiled as embedded Swift",
+    "swiftembed": "Tests are compiled as embedded Swift",
     "swift": "Tests are compiled as normal Swift",
 }
 

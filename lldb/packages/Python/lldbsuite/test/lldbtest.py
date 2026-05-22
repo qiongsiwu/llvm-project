@@ -1964,7 +1964,7 @@ def _swift_module_importer_setup(test_instance, variant_value):
         test_instance.runCmd("settings set symbols.use-swift-clangimporter true")
 
 def _embedded_swift_setup(test_instance, variant_value):
-    if variant_value == "swift_embedded":
+    if variant_value == "swiftembed":
         test_instance.extra_make_flags["SWIFT_EMBEDDED_MODE"] = "1"
     elif variant_value == "swift":
         test_instance.extra_make_flags["SWIFT_EMBEDDED_MODE"] = "0"
