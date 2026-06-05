@@ -376,6 +376,17 @@ LLDBMemoryReader::resolveIndirectAddressAtOffset(
   if (!section->IsGOTSection())
     return offset_address;
 
+  Target &target(m_process.GetTarget());
+  addr_t got_key = lldb_offset_address.GetLoadAddress(&target);
+  if (auto cache_it = m_got_entry_cache.find(got_key);
+      cache_it != m_got_entry_cache.end()) {
+    LLDB_LOGV(log,
+              "[MemoryReader::resolveAddressAtOffset] GOT cache hit for {0:x}",
+              got_key);
+    return swift::remote::RemoteAddress(
+        cache_it->second, swift::remote::RemoteAddress::DefaultAddressSpace);
+  }
+
   // offset_address is in a GOT section. Re-read the offset from the base
   // address in live memory, since the offset in live memory can have been
   // patched in the shared cache to point somewhere else.
@@ -394,7 +405,6 @@ LLDBMemoryReader::resolveIndirectAddressAtOffset(
   }
 
   auto lldb_addr = *maybe_lldb_addr;
-  Target &target(m_process.GetTarget());
   Status error;
   const bool force_live_memory = true;
   bool did_read_live_memory = false;
@@ -433,9 +443,10 @@ LLDBMemoryReader::resolveIndirectAddressAtOffset(
       "into live address {0:x} and offset {1:x} resulting in address {2:x}",
       live_address, live_offset, live_address + live_offset);
 
+  addr_t result = live_address + live_offset;
+  m_got_entry_cache.try_emplace(got_key, result);
   return swift::remote::RemoteAddress(
-      live_address + live_offset,
-      swift::remote::RemoteAddress::DefaultAddressSpace);
+      result, swift::remote::RemoteAddress::DefaultAddressSpace);
 }
 
 bool LLDBMemoryReader::readBytes(swift::remote::RemoteAddress address,

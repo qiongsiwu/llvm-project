@@ -20,6 +20,7 @@
 #include "swift/RemoteInspection/ReflectionContext.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Memory.h"
 
@@ -172,6 +173,12 @@ private:
   /// stores each lldb::Module and the first virtual address after the end of
   /// that module's virtual address space.
   std::vector<std::pair<uint64_t, lldb::ModuleSP>> m_range_module_map;
+
+  /// Cache from GOT entry tagged address to its resolved live address. Shared
+  /// cache GOT entries are fixed for the life of the process, so many relative
+  /// pointers landing on the same GOT entry pay the live-memory read cost only
+  /// once.
+  llvm::DenseMap<uint64_t, lldb::addr_t> m_got_entry_cache;
 
   /// The set of modules where we should read memory from the symbol file's
   /// object file instead of the main object file.
