@@ -9,6 +9,7 @@
 #ifndef LLVM_CLANG_TOOLING_DEPENDENCYSCANNINGTOOL_H
 #define LLVM_CLANG_TOOLING_DEPENDENCYSCANNINGTOOL_H
 
+#include "clang/DependencyScanning/DependencyActionController.h"
 #include "clang/DependencyScanning/DependencyScannerImpl.h"
 #include "clang/DependencyScanning/DependencyScanningService.h"
 #include "clang/DependencyScanning/DependencyScanningUtils.h"
@@ -116,6 +117,21 @@ public:
   llvm::vfs::TracingFileSystem *getWorkerTracingVFS() const {
     return Worker.getTracingVFS();
   }
+
+  /// New interface that takes a getNextInput function.
+  /// Subject to change.
+  /// Note that getNextInput's return type and deliverResult's first argument's
+  /// type will need to be a variant of some sort so it can handle inputs from
+  /// by-name lookup and TU lookup.
+  bool computeDependenciesWithDrain(
+      StringRef CWD, ArrayRef<std::string> CommandLine,
+      DiagnosticConsumer &DiagConsumer,
+      dependencies::DependencyActionController &Controller,
+      const llvm::DenseSet<dependencies::ModuleID> &AlreadySeen,
+      llvm::function_ref<std::optional<std::string>()> getNextInput,
+      llvm::function_ref<void(StringRef,
+                              std::optional<dependencies::TranslationUnitDeps>)>
+          deliverResult);
 
 private:
   dependencies::DependencyScanningWorker Worker;

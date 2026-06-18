@@ -9,6 +9,7 @@
 #include "clang/Tooling/DependencyScanningTool.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticFrontend.h"
+#include "clang/DependencyScanning/DependencyActionController.h"
 #include "clang/DependencyScanning/DependencyScannerImpl.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
@@ -341,6 +342,32 @@ DependencyScanningTool::getModuleDependencies(
 
   return MaybeCIWithContext->computeDependenciesByNameOrError(
       ModuleName, AlreadySeen, Controller);
+}
+
+bool DependencyScanningTool::computeDependenciesWithDrain(
+    StringRef CWD, ArrayRef<std::string> CommandLine,
+    DiagnosticConsumer &DiagConsumer, DependencyActionController &Controller,
+    const llvm::DenseSet<ModuleID> &AlreadySeen,
+    llvm::function_ref<std::optional<std::string>()> getNextInput,
+    llvm::function_ref<void(StringRef, std::optional<TranslationUnitDeps>)>
+        deliverResult) {
+  auto CIWC = CompilerInstanceWithContext::initializeFromCommandline(
+      *this, CWD, CommandLine, Controller, DiagConsumer);
+
+  // The diagnostic is routed through the DiagConsumer already, so the
+  // caller has access to it.
+  if (!CIWC)
+    return false;
+
+  while (auto NextInput = getNextInput()) {
+    FullDependencyConsumer Consumer(AlreadySeen);
+    if (CIWC->computeDependencies(*NextInput, Consumer, Controller))
+      deliverResult(*NextInput, Consumer.takeTranslationUnitDeps());
+    else
+      deliverResult(*NextInput, std::nullopt);
+  }
+
+  return true;
 }
 
 static std::optional<SmallVector<std::string, 0>>
