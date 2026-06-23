@@ -331,10 +331,8 @@ enum CXErrorCode clang_experimental_DependencyScannerWorker_getDepGraph(
   if (ModuleName) {
     // FIXME: Tool creates its own worker. Avoid that.
     DependencyScanningTool Tool(Worker->getService());
-    auto MaybeCIWithCtx =
-        CompilerInstanceWithContext::initializeFromCommandline(
-            Tool, WorkingDirectory, Compilation, *Controller,
-            *SerialDiagConsumer);
+    auto MaybeCIWithCtx = createCompilerInstanceWithContextFromCommandline(
+        Tool, WorkingDirectory, Compilation, *Controller, *SerialDiagConsumer);
 
     if (!MaybeCIWithCtx)
       return CXError_Failure;
