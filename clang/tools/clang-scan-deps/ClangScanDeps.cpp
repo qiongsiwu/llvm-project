@@ -1275,9 +1275,8 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
                                  LocalIndex, DependencyOS, Errs))
             HadErrors = true;
         } else {
-          auto CIWithCtx = CompilerInstanceWithContext::initializeOrError(
-              WorkerTool, CWD, Input->CommandLine, *Controller);
-          if (llvm::Error Err = CIWithCtx.takeError()) {
+          if (llvm::Error Err = WorkerTool.initializeForByNameLookup(
+                  CWD, Input->CommandLine, *Controller)) {
             handleErrorWithInfoString(
                 "Compiler instance with context setup error", std::move(Err),
                 DependencyOS, Errs);
@@ -1287,7 +1286,7 @@ int clang_scan_deps_main(int argc, char **argv, const llvm::ToolContext &) {
 
           for (auto N : Names) {
             auto MaybeModuleDepsGraph =
-                CIWithCtx->computeDependenciesByNameOrError(
+                WorkerTool.computeDependenciesByNameOrError(
                     N, AlreadySeenModules, *Controller);
             if (handleModuleResult(N, MaybeModuleDepsGraph, *FD, LocalIndex,
                                    DependencyOS, Errs)) {

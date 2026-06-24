@@ -429,13 +429,9 @@ DependencyScanningTool::getModuleDependencies(
     StringRef ModuleName, ArrayRef<std::string> CommandLine, StringRef CWD,
     const llvm::DenseSet<ModuleID> &AlreadySeen,
     DependencyActionController &Controller) {
-  auto MaybeCIWithContext = CompilerInstanceWithContext::initializeOrError(
-      *this, CWD, CommandLine, Controller);
-  if (auto Error = MaybeCIWithContext.takeError())
-    return Error;
-
-  return MaybeCIWithContext->computeDependenciesByNameOrError(
-      ModuleName, AlreadySeen, Controller);
+  if (llvm::Error Err = initializeForByNameLookup(CWD, CommandLine, Controller))
+    return std::move(Err);
+  return computeDependenciesByNameOrError(ModuleName, AlreadySeen, Controller);
 }
 
 static std::optional<SmallVector<std::string, 0>>
@@ -496,6 +492,34 @@ tooling::createCompilerInstanceWithContextFromCommandline(
       std::move(DiagEngineWithCmdAndOpts), std::move(OverlayFS), Controller);
 }
 
+llvm::Error DependencyScanningTool::initializeForByNameLookup(
+    StringRef CWD, ArrayRef<std::string> CommandLine,
+    DependencyActionController &Controller) {
+  ByNameCIWC.reset();
+  DiagPrinter = std::make_unique<TextDiagnosticsPrinterWithOutput>(CommandLine);
+  auto Result = createCompilerInstanceWithContextFromCommandline(
+      *this, CWD, CommandLine, Controller, DiagPrinter->DiagPrinter);
+  if (!Result)
+    return makeErrorFromDiagnosticsOS(*DiagPrinter);
+  ByNameCIWC =
+      std::make_unique<CompilerInstanceWithContext>(std::move(*Result));
+  return llvm::Error::success();
+}
+
+llvm::Expected<TranslationUnitDeps>
+DependencyScanningTool::computeDependenciesByNameOrError(
+    StringRef ModuleName, const llvm::DenseSet<ModuleID> &AlreadySeen,
+    DependencyActionController &Controller) {
+  assert(ByNameCIWC && "initializeForByNameLookup must be called first");
+  FullDependencyConsumer Consumer(AlreadySeen);
+  // FIXME: Make IncludeTreeActionController re-entrant and avoid cloning here.
+  auto ControllerClone = Controller.clone();
+  DiagPrinter->DiagnosticOutput.clear();
+  if (ByNameCIWC->computeDependencies(ModuleName, Consumer, *ControllerClone))
+    return Consumer.takeTranslationUnitDeps();
+  return makeErrorFromDiagnosticsOS(*DiagPrinter);
+}
+
 std::optional<CompilerInstanceWithContext>
 CompilerInstanceWithContext::initializeFromCC1Commandline(
     DependencyScanningWorker &Worker, StringRef CWD,
@@ -509,37 +533,6 @@ CompilerInstanceWithContext::initializeFromCC1Commandline(
                        std::move(OverlayFS)))
     return std::nullopt;
   return std::move(CIWC);
-}
-
-llvm::Expected<CompilerInstanceWithContext>
-CompilerInstanceWithContext::initializeOrError(
-    DependencyScanningTool &Tool, StringRef CWD,
-    ArrayRef<std::string> CommandLine, DependencyActionController &Controller) {
-  auto DiagPrinterWithOS =
-      std::make_unique<TextDiagnosticsPrinterWithOutput>(CommandLine);
-
-  auto Result = createCompilerInstanceWithContextFromCommandline(
-      Tool, CWD, CommandLine, Controller, DiagPrinterWithOS->DiagPrinter);
-  if (Result) {
-    Result->DiagPrinterWithOS = std::move(DiagPrinterWithOS);
-    return std::move(*Result);
-  }
-  return makeErrorFromDiagnosticsOS(*DiagPrinterWithOS);
-}
-
-llvm::Expected<TranslationUnitDeps>
-CompilerInstanceWithContext::computeDependenciesByNameOrError(
-    StringRef ModuleName, const llvm::DenseSet<ModuleID> &AlreadySeen,
-    DependencyActionController &Controller) {
-  // FIXME: Make IncludeTreeActionController re-entrant and avoid cloning here.
-  auto ControllerClone = Controller.clone();
-  FullDependencyConsumer Consumer(AlreadySeen);
-  // We need to clear the DiagnosticOutput so that each by-name lookup
-  // has a clean diagnostics buffer.
-  DiagPrinterWithOS->DiagnosticOutput.clear();
-  if (computeDependencies(ModuleName, Consumer, *ControllerClone))
-    return Consumer.takeTranslationUnitDeps();
-  return makeErrorFromDiagnosticsOS(*DiagPrinterWithOS);
 }
 
 std::unique_ptr<DependencyActionController>
@@ -606,16 +599,13 @@ bool CompilerInstanceWithContext::initialize(
     std::unique_ptr<DiagnosticsEngineWithDiagOpts> DiagEngineWithDiagOpts,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> OverlayFS) {
   assert(DiagEngineWithDiagOpts && "Valid diagnostics engine required!");
-  DiagEngineWithCmdAndOpts = std::move(DiagEngineWithDiagOpts);
-  DiagConsumer = DiagEngineWithCmdAndOpts->DiagEngine->getClient();
-
   assert(OverlayFS && "OverlayFS required!");
   auto FS = Worker.makeEffectiveVFS(CWD, std::move(OverlayFS));
 
   OriginalInvocation = createCompilerInvocation(
-      CommandLine, *DiagEngineWithCmdAndOpts->DiagEngine);
+      CommandLine, *DiagEngineWithDiagOpts->DiagEngine);
   if (!OriginalInvocation) {
-    DiagEngineWithCmdAndOpts->DiagEngine->Report(
+    DiagEngineWithDiagOpts->DiagEngine->Report(
         diag::err_fe_expected_compiler_job)
         << llvm::join(CommandLine, " ");
     return false;
@@ -635,7 +625,7 @@ bool CompilerInstanceWithContext::initialize(
   auto &CI = *CIPtr;
 
   initializeScanCompilerInstance(
-      CI, std::move(FS), DiagEngineWithCmdAndOpts->DiagEngine->getClient(),
+      CI, std::move(FS), DiagEngineWithDiagOpts->DiagEngine->getClient(),
       Worker.Service, Worker.DepFS);
 
   StableDirs = getInitialStableDirs(CI);
