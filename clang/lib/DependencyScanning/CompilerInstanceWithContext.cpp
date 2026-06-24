@@ -90,6 +90,31 @@ bool CompilerInstanceWithContext::initialize(
   return true;
 }
 
+bool CompilerInstanceWithContext::applyAndReport(
+    ModuleDepCollector &MDC, CompilerInvocation &ModuleInvocation,
+    DependencyConsumer &Consumer, DependencyActionController &Controller,
+    StringRef Executable) {
+  MDC.applyDiscoveredDependencies(ModuleInvocation);
+
+  bool Success = ModuleInvocation.withCowRef<bool>(
+      [&](CowCompilerInvocation &CowModuleInvocation) {
+        return Controller.finalize(*CIPtr, CowModuleInvocation);
+      });
+  if (!Success)
+    return false;
+
+  std::string ID = ModuleInvocation.getFrontendOpts().CASIncludeTreeID;
+  if (!ID.empty())
+    Consumer.handleIncludeTreeID(std::move(ID));
+
+  auto LastCC1CacheKey = Controller.getCacheKey(ModuleInvocation);
+
+  Consumer.handleBuildCommand({Executable.str(),
+                               ModuleInvocation.getCC1CommandLine(),
+                               std::move(LastCC1CacheKey)});
+  return true;
+}
+
 bool CompilerInstanceWithContext::computeDependencies(
     StringRef ModuleName, DependencyConsumer &Consumer,
     DependencyActionController &Controller) {
@@ -184,24 +209,6 @@ bool CompilerInstanceWithContext::computeDependencies(
     return false;
 
   MDC->run(Consumer);
-  MDC->applyDiscoveredDependencies(ModuleInvocation);
-
-  bool Success = ModuleInvocation.withCowRef<bool>(
-      [&](CowCompilerInvocation &CowModuleInvocation) {
-        return Controller.finalize(CI, CowModuleInvocation);
-      });
-  if (!Success)
-    return false;
-
-  std::string ID = ModuleInvocation.getFrontendOpts().CASIncludeTreeID;
-  if (!ID.empty())
-    Consumer.handleIncludeTreeID(std::move(ID));
-
-  auto LastCC1Arguments = ModuleInvocation.getCC1CommandLine();
-  auto LastCC1CacheKey = Controller.getCacheKey(ModuleInvocation);
-
-  Consumer.handleBuildCommand({CommandLine[0], std::move(LastCC1Arguments),
-                               std::move(LastCC1CacheKey)});
-
-  return true;
+  return applyAndReport(*MDC, ModuleInvocation, Consumer, Controller,
+                        CommandLine[0]);
 }
