@@ -11,6 +11,7 @@
 #include "clang/Basic/DiagnosticFrontend.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/DependencyScanning/CachingActions.h"
+#include "clang/DependencyScanning/CompilerInstanceWithContext.h"
 #include "clang/DependencyScanning/DependencyScannerImpl.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
@@ -457,8 +458,7 @@ getFirstCC1CommandLine(ArrayRef<std::string> CommandLine,
   return std::nullopt;
 }
 
-std::optional<dependencies::CompilerInstanceWithContext>
-tooling::createCompilerInstanceWithContextFromCommandline(
+bool tooling::initializeWorkerForByNameLookup(
     DependencyScanningTool &Tool, StringRef CWD,
     ArrayRef<std::string> CommandLine, DependencyActionController &Controller,
     DiagnosticConsumer &DC) {
@@ -472,10 +472,9 @@ tooling::createCompilerInstanceWithContextFromCommandline(
   if (ModifiedCommandLine.size() >= 2 && ModifiedCommandLine[1] == "-cc1") {
     // The input command line is already a -cc1 invocation; initialize the
     // compiler instance directly from it.
-    return dependencies::CompilerInstanceWithContext::
-        initializeFromCC1Commandline(Tool.getWorker(), CWD, ModifiedCommandLine,
-                                     std::move(DiagEngineWithCmdAndOpts),
-                                     std::move(OverlayFS), Controller);
+    return Tool.getWorker().initializeCIWC(CWD, ModifiedCommandLine,
+                                           std::move(DiagEngineWithCmdAndOpts),
+                                           std::move(OverlayFS), Controller);
   }
 
   // The input command line is either a driver-style command line, or
@@ -484,27 +483,23 @@ tooling::createCompilerInstanceWithContextFromCommandline(
   const auto MaybeFirstCC1 = getFirstCC1CommandLine(
       ModifiedCommandLine, *DiagEngineWithCmdAndOpts->DiagEngine, FS);
   if (!MaybeFirstCC1)
-    return std::nullopt;
+    return false;
 
   std::vector<std::string> CC1CommandLine(MaybeFirstCC1->begin(),
                                           MaybeFirstCC1->end());
-  return dependencies::CompilerInstanceWithContext::
-      initializeFromCC1Commandline(Tool.getWorker(), CWD, CC1CommandLine,
-                                   std::move(DiagEngineWithCmdAndOpts),
-                                   std::move(OverlayFS), Controller);
+  return Tool.getWorker().initializeCIWC(CWD, CC1CommandLine,
+                                         std::move(DiagEngineWithCmdAndOpts),
+                                         std::move(OverlayFS), Controller);
 }
 
 llvm::Error DependencyScanningTool::initializeForByNameLookup(
     StringRef CWD, ArrayRef<std::string> CommandLine,
     DependencyActionController &Controller) {
-  ByNameCIWC.reset();
+  Worker.resetCIWC();
   DiagPrinter = std::make_unique<TextDiagnosticsPrinterWithOutput>(CommandLine);
-  auto Result = createCompilerInstanceWithContextFromCommandline(
-      *this, CWD, CommandLine, Controller, DiagPrinter->DiagPrinter);
-  if (!Result)
+  if (!initializeWorkerForByNameLookup(*this, CWD, CommandLine, Controller,
+                                       DiagPrinter->DiagPrinter))
     return makeErrorFromDiagnosticsOS(*DiagPrinter);
-  ByNameCIWC = std::make_unique<dependencies::CompilerInstanceWithContext>(
-      std::move(*Result));
   return llvm::Error::success();
 }
 
@@ -512,12 +507,11 @@ llvm::Expected<TranslationUnitDeps>
 DependencyScanningTool::computeDependenciesByNameOrError(
     StringRef ModuleName, const llvm::DenseSet<ModuleID> &AlreadySeen,
     DependencyActionController &Controller) {
-  assert(ByNameCIWC && "initializeForByNameLookup must be called first");
   FullDependencyConsumer Consumer(AlreadySeen);
   // FIXME: Make IncludeTreeActionController re-entrant and avoid cloning here.
   auto ControllerClone = Controller.clone();
   DiagPrinter->DiagnosticOutput.clear();
-  if (ByNameCIWC->computeDependencies(ModuleName, Consumer, *ControllerClone))
+  if (Worker.computeDependenciesByName(ModuleName, Consumer, *ControllerClone))
     return Consumer.takeTranslationUnitDeps();
   return makeErrorFromDiagnosticsOS(*DiagPrinter);
 }

@@ -331,13 +331,13 @@ enum CXErrorCode clang_experimental_DependencyScannerWorker_getDepGraph(
   if (ModuleName) {
     // FIXME: Tool creates its own worker. Avoid that.
     DependencyScanningTool Tool(Worker->getService());
-    auto MaybeCIWithCtx = createCompilerInstanceWithContextFromCommandline(
+    bool Success = initializeWorkerForByNameLookup(
         Tool, WorkingDirectory, Compilation, *Controller, *SerialDiagConsumer);
 
-    if (!MaybeCIWithCtx)
+    if (!Success)
       return CXError_Failure;
-    Result = MaybeCIWithCtx->computeDependencies(StringRef(ModuleName),
-                                                 DepConsumer, *Controller);
+    Result = Tool.getWorker().computeDependenciesByName(
+        StringRef(ModuleName), DepConsumer, *Controller);
     if (!Result)
       return CXError_Failure;
   } else {

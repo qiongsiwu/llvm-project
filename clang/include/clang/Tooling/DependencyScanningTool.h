@@ -9,7 +9,6 @@
 #ifndef LLVM_CLANG_TOOLING_DEPENDENCYSCANNINGTOOL_H
 #define LLVM_CLANG_TOOLING_DEPENDENCYSCANNINGTOOL_H
 
-#include "clang/DependencyScanning/CompilerInstanceWithContext.h"
 #include "clang/DependencyScanning/DependencyScannerImpl.h"
 #include "clang/DependencyScanning/DependencyScanningService.h"
 #include "clang/DependencyScanning/DependencyScanningUtils.h"
@@ -171,9 +170,10 @@ public:
       dependencies::DependencyActionController &Controller);
 
 private:
-  dependencies::DependencyScanningWorker Worker;
+  // Dependency scanning worker has components that depends on the DiagPrinter.
+  // Hence the DiagPrinter is declared first. Do not change the ordering.
   std::unique_ptr<dependencies::TextDiagnosticsPrinterWithOutput> DiagPrinter;
-  std::unique_ptr<dependencies::CompilerInstanceWithContext> ByNameCIWC;
+  dependencies::DependencyScanningWorker Worker;
 };
 
 /// Run the dependency scanning worker for the given driver or frontend
@@ -195,8 +195,7 @@ bool computeDependencies(
     DiagnosticConsumer &DiagConsumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> OverlayFS = nullptr);
 
-std::optional<dependencies::CompilerInstanceWithContext>
-createCompilerInstanceWithContextFromCommandline(
+bool initializeWorkerForByNameLookup(
     DependencyScanningTool &Tool, StringRef CWD,
     ArrayRef<std::string> CommandLine,
     dependencies::DependencyActionController &Controller,
