@@ -29,6 +29,9 @@ class CompilerInstanceWithContext {
   llvm::SmallVector<StringRef> StableDirs;
   dependencies::PrebuiltModulesAttrsMap PrebuiltModuleASTMap;
 
+  // Context - used by AsyncScan's prescan pass
+  IntrusiveRefCntPtr<llvm::vfs::FileSystem> ScanFS;
+
   // Compiler Instance
   std::unique_ptr<CompilerInstance> CIPtr;
 
@@ -43,6 +46,9 @@ class CompilerInstanceWithContext {
                   std::unique_ptr<dependencies::DiagnosticsEngineWithDiagOpts>
                       DiagEngineWithDiagOpts,
                   IntrusiveRefCntPtr<llvm::vfs::FileSystem> OverlayFS);
+
+  bool prescanModulesAsync(AsyncModuleCompiles &Compiles,
+                           DependencyActionController &Controller);
 
 public:
   /// @brief Initialize the tool's compiler instance from the cc1 commandline.
