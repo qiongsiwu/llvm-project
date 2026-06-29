@@ -47,6 +47,9 @@ class CompilerInstanceWithContext {
                       DiagEngineWithDiagOpts,
                   IntrusiveRefCntPtr<llvm::vfs::FileSystem> OverlayFS);
 
+  bool initializeScanInstance(DependencyActionController &Controller,
+                              DiagnosticConsumer *DiagConsumer);
+
   bool prescanModulesAsync(AsyncModuleCompiles &Compiles,
                            DependencyActionController &Controller);
 
