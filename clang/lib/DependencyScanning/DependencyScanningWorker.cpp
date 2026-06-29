@@ -161,12 +161,15 @@ void DependencyScanningWorker::computeDependenciesFromCompilerInvocation(
     DepFile = Path.str().str();
   }
 
-  DependencyScanningAction Action(Service, WorkingDirectory, DepsConsumer,
-                                  Controller, DepFS, VerboseOS);
+  auto MaybeCIWC = CompilerInstanceWithContext::initializeFromInvocation(
+      *this, WorkingDirectory, std::move(Invocation), DiagsConsumer, VerboseOS,
+      Controller);
+
+  if (!MaybeCIWC)
+    return;
 
   // Ignore result; we're just collecting dependencies.
   //
   // FIXME: will clients other than -cc1scand care?
-  (void)Action.runInvocation("<clang>", std::move(Invocation), DepFS,
-                             PCHContainerOps, &DiagsConsumer);
+  (void)MaybeCIWC->scanTranslationUnit(DepsConsumer, Controller);
 }

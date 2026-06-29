@@ -37,6 +37,21 @@ CompilerInstanceWithContext::initializeFromCC1Commandline(
   return std::move(CIWC);
 }
 
+std::optional<CompilerInstanceWithContext>
+CompilerInstanceWithContext::initializeFromInvocation(
+    dependencies::DependencyScanningWorker &Worker, StringRef CWD,
+    std::shared_ptr<CompilerInvocation> Invocation,
+    DiagnosticConsumer &DiagConsumer, raw_ostream *VerboseOS,
+    dependencies::DependencyActionController &Controller) {
+  CompilerInstanceWithContext CIWC(Worker, CWD, {"<clang>"});
+  CIWC.VerboseOS = VerboseOS;
+  CIWC.ScanFS = Worker.makeEffectiveVFS(CWD, /*OverlayFS=*/nullptr);
+  CIWC.OriginalInvocation = std::make_unique<CompilerInvocation>(*Invocation);
+  if (!CIWC.initializeScanInstance(Controller, &DiagConsumer))
+    return std::nullopt;
+  return std::move(CIWC);
+}
+
 bool CompilerInstanceWithContext::initialize(
     DependencyActionController &Controller,
     std::unique_ptr<DiagnosticsEngineWithDiagOpts> DiagEngineWithDiagOpts,
@@ -277,6 +292,9 @@ CompilerInstanceWithContext::scanTranslationUnit(
 
   if (!Controller.initialize(CI, *OriginalInvocation))
     return nullptr;
+
+  if (VerboseOS)
+    CI.setVerboseOutputStream(*VerboseOS);
 
   ReadPCHAndPreprocessAction Action;
   if (!CI.ExecuteAction(Action))

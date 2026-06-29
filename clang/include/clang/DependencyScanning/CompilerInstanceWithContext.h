@@ -38,6 +38,10 @@ class CompilerInstanceWithContext {
   // Source location offset.
   int32_t SrcLocOffset = 0;
 
+  // Verbose output stream used for invocation scanning only.
+  // null for TU scanning and by-name scanning.
+  raw_ostream *VerboseOS = nullptr;
+
   CompilerInstanceWithContext(dependencies::DependencyScanningWorker &Worker,
                               StringRef CWD, ArrayRef<std::string> CMD)
       : Worker(Worker), CWD(CWD), CommandLine(CMD.begin(), CMD.end()) {}
@@ -70,6 +74,23 @@ public:
       std::unique_ptr<dependencies::DiagnosticsEngineWithDiagOpts>
           DiagEngineWithDiagOpts,
       IntrusiveRefCntPtr<llvm::vfs::FileSystem> OverlayFS,
+      dependencies::DependencyActionController &Controller);
+
+  /// @brief Initialize the compiler instance from an already-built compiler
+  ///        invocation (the cc1depscan / include-tree path). Unlike
+  ///        initializeFromCC1Commandline there is no command line to lower;
+  ///        OriginalInvocation is seeded directly from \p Invocation.
+  /// @param Worker The dependency scanning worker to initialize the compiler
+  ///        instance.
+  /// @param CWD The current working directory.
+  /// @param Invocation A compiler invocation to scan.
+  /// @param DiagConsumer The diagnostics sink for the scan instance.
+  /// @param VerboseOS Optional verbose output stream for module builds.
+  /// @param Controller A dependency action controller to gather results.
+  static std::optional<CompilerInstanceWithContext> initializeFromInvocation(
+      dependencies::DependencyScanningWorker &Worker, StringRef CWD,
+      std::shared_ptr<CompilerInvocation> Invocation,
+      DiagnosticConsumer &DiagConsumer, raw_ostream *VerboseOS,
       dependencies::DependencyActionController &Controller);
 
   bool
