@@ -26,40 +26,8 @@ namespace dependencies {
 class DependencyScanningService;
 class DependencyScanningWorker;
 
-class DependencyConsumer;
 class DependencyActionController;
 class DependencyScanningWorkerFilesystem;
-
-class DependencyScanningAction {
-public:
-  DependencyScanningAction(
-      DependencyScanningService &Service, StringRef WorkingDirectory,
-      DependencyConsumer &Consumer, DependencyActionController &Controller,
-      IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS,
-      raw_ostream *VerboseOS = nullptr)
-      : Service(Service), WorkingDirectory(WorkingDirectory),
-        Consumer(Consumer), Controller(Controller), DepFS(std::move(DepFS)),
-        VerboseOS(VerboseOS) {}
-  bool runInvocation(std::string Executable,
-                     std::shared_ptr<CompilerInvocation> Invocation,
-                     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
-                     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-                     DiagnosticConsumer *DiagConsumer);
-
-  bool hasScanned() const { return Scanned; }
-
-private:
-  DependencyScanningService &Service;
-  StringRef WorkingDirectory;
-  DependencyConsumer &Consumer;
-  DependencyActionController &Controller;
-  llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS;
-  std::optional<StringRef> ModuleName;
-  std::optional<CompilerInstance> ScanInstanceStorage;
-  std::shared_ptr<ModuleDepCollector> MDC;
-  bool Scanned = false;
-  raw_ostream *VerboseOS;
-};
 
 // Helper functions and data types.
 std::unique_ptr<DiagnosticOptions>
