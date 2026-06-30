@@ -331,20 +331,30 @@ enum CXErrorCode clang_experimental_DependencyScannerWorker_getDepGraph(
   if (ModuleName) {
     // FIXME: Tool creates its own worker. Avoid that.
     DependencyScanningTool Tool(Worker->getService());
-    bool Success = initializeWorkerForByNameLookup(
-        Tool, WorkingDirectory, Compilation, *Controller, *SerialDiagConsumer);
+    bool Pulled = false;
+    auto getNextName = [&]() -> std::optional<std::string> {
+      if (Pulled)
+        return std::nullopt;
+      Pulled = true;
+      return StringRef(ModuleName).str();
+    };
+    auto deliverResult = [&](StringRef, std::optional<TranslationUnitDeps> R) {
+      if (R)
+        DepGraph->TUDeps = std::move(*R);
+    };
 
-    if (!Success)
+    if (!Tool.computeDependenciesByNameWithDrain(
+            WorkingDirectory, Compilation, *SerialDiagConsumer, *Controller,
+            AlreadySeen, getNextName, deliverResult))
       return CXError_Failure;
-    Result = Tool.getWorker().computeDependenciesByName(
-        StringRef(ModuleName), DepConsumer, *Controller);
-    if (!Result)
-      return CXError_Failure;
-  } else {
-    Result = clang::tooling::computeDependencies(
-        *Worker, WorkingDirectory, Compilation, DepConsumer, *Controller,
-        *SerialDiagConsumer);
+    // Result is already merged with DepGraph in delilverResult.
+    return CXError_Success;
   }
+
+  // TU scanning.
+  Result = clang::tooling::computeDependencies(
+      *Worker, WorkingDirectory, Compilation, DepConsumer, *Controller,
+      *SerialDiagConsumer);
 
   if (!Result)
     return CXError_Failure;
