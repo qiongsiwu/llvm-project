@@ -11,12 +11,12 @@
 #include "clang/Basic/DiagnosticFrontend.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/DependencyScanning/CachingActions.h"
-#include "clang/DependencyScanning/DependencyScannerImpl.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/Tool.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -33,6 +33,21 @@ using namespace dependencies;
 using llvm::Error;
 
 namespace {
+
+struct TextDiagnosticsPrinterWithOutput {
+  // We need to bound the lifetime of the data that supports the DiagPrinter
+  // with it together so they have the same lifetime.
+  std::string DiagnosticOutput;
+  llvm::raw_string_ostream DiagnosticsOS;
+  std::unique_ptr<DiagnosticOptions> DiagOpts;
+  TextDiagnosticPrinter DiagPrinter;
+
+  TextDiagnosticsPrinterWithOutput(ArrayRef<std::string> CommandLine)
+      : DiagnosticsOS(DiagnosticOutput),
+        DiagOpts(createDiagOptions(CommandLine)),
+        DiagPrinter(DiagnosticsOS, *DiagOpts) {}
+};
+
 /// Prints out all of the gathered dependencies into a string.
 class MakeDependencyPrinterConsumer : public DependencyConsumer {
 public:
